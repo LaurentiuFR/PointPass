@@ -17,25 +17,42 @@ namespace PointPass.Players
         [SerializeField] private float deceleration = 35f;
         [SerializeField] private float turnSpeed = 15f;
 
-        [Header("Input")]
-        [SerializeField] private VirtualJoystick joystick;
-
+        private VirtualJoystick joystick;
         private Rigidbody2D body;
         private Vector2 moveInput;
+
+        public Rigidbody2D Body => body != null ? body : (body = GetComponent<Rigidbody2D>());
+        public bool InputEnabled { get; set; } = true;
+        public float SpeedMultiplier { get; set; } = 1f;
 
         private void Awake()
         {
             body = GetComponent<Rigidbody2D>();
         }
 
+        public void Bind(VirtualJoystick stick)
+        {
+            joystick = stick;
+        }
+
+        public void ResetTo(Vector2 position, float angle)
+        {
+            Body.linearVelocity = Vector2.zero;
+            Body.angularVelocity = 0f;
+            Body.position = position;
+            Body.rotation = angle;
+            transform.position = position;
+            moveInput = Vector2.zero;
+        }
+
         private void Update()
         {
-            moveInput = ReadInput();
+            moveInput = InputEnabled ? ReadInput() : Vector2.zero;
         }
 
         private void FixedUpdate()
         {
-            Vector2 targetVelocity = moveInput * maxSpeed;
+            Vector2 targetVelocity = moveInput * (maxSpeed * SpeedMultiplier);
             bool hasInput = moveInput.sqrMagnitude > 0.01f;
             float rate = hasInput ? acceleration : deceleration;
 
