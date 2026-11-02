@@ -154,11 +154,11 @@ namespace PointPass.Gameplay
         private void Ellipse(Vector2 center, Vector2 radius, Color color, int segments)
         {
             int start = vertices.Count;
-            vertices.Add(center); colors.Add(color);
+            vertices.Add(center); colors.Add(MatchPalette.WorldColor(color));
             for (int i = 0; i <= segments; i++)
             {
                 float angle = i * Mathf.PI * 2 / segments;
-                vertices.Add(center + new Vector2(Mathf.Cos(angle) * radius.x, Mathf.Sin(angle) * radius.y)); colors.Add(color);
+                vertices.Add(center + new Vector2(Mathf.Cos(angle) * radius.x, Mathf.Sin(angle) * radius.y)); colors.Add(MatchPalette.WorldColor(color));
             }
             for (int i = 0; i < segments; i++) { triangles.Add(start); triangles.Add(start + i + 1); triangles.Add(start + i + 2); }
         }
@@ -168,7 +168,7 @@ namespace PointPass.Gameplay
             int start = vertices.Count;
             Vector2 normal = Vector2.Perpendicular((to - from).normalized) * width * 0.5f;
             vertices.Add(from - normal); vertices.Add(to - normal); vertices.Add(to + normal); vertices.Add(from + normal);
-            for (int i = 0; i < 4; i++) colors.Add(color);
+            for (int i = 0; i < 4; i++) colors.Add(MatchPalette.WorldColor(color));
             triangles.Add(start); triangles.Add(start + 1); triangles.Add(start + 2);
             triangles.Add(start); triangles.Add(start + 2); triangles.Add(start + 3);
         }

@@ -230,6 +230,7 @@ namespace PointPass.Gameplay
             ball.SetCurve(0f);
             hud.ShowGoalMessage(lastScoringTeam,wasOwnGoal);
             yield return new WaitForSeconds(MatchConfig.GoalPauseSeconds);
+            replay?.CompleteGoalCapture();
 
             if (overtime)
             {

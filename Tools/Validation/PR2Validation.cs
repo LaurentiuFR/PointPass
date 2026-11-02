@@ -27,7 +27,7 @@ public static class PR2Validation
     public static void Run()
     {
         int exit = 0;
-        try { Kicks(); Movement(); Buttons(); Joystick(); PhysicalPass(); DribbleFeel(); InputRouting(); InputFeelValidation.Run(Check); TurningValidation.Run(Check); PresentationValidation.Run(Check); MenuValidation.Run(Check); FlowAnimationValidation.Run(Check); CurveValidation.Run(Check); FlickValidation.Run(Check); StadiumValidation.Run(Check); GoalPresentationValidation.Run(Check); MatchDayValidation.Run(Check); GoalMomentValidation.Run(Check); }
+        try { Kicks(); Movement(); Buttons(); Joystick(); PhysicalPass(); DribbleFeel(); InputRouting(); InputFeelValidation.Run(Check); TurningValidation.Run(Check); PresentationValidation.Run(Check); MenuValidation.Run(Check); FlowAnimationValidation.Run(Check); CurveValidation.Run(Check); FlickValidation.Run(Check); StadiumValidation.Run(Check); GoalPresentationValidation.Run(Check); MatchDayValidation.Run(Check); GoalMomentValidation.Run(Check); MenuSharpnessValidation.Run(Check); LightingValidation.Run(Check); ReplayValidation.Run(Check); }
         catch (Exception ex) { results.Add(ex.ToString()); exit = 1; }
         File.WriteAllLines("../PR2Verification/engine-tests.txt", results);
         Debug.Log(string.Join("\n", results));

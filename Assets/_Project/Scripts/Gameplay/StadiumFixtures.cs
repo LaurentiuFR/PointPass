@@ -13,6 +13,17 @@ namespace PointPass.Gameplay
         public static Vector2 LightPosition(int index) => new Vector2(index % 2 == 0 ? -10.55f : 10.55f,
             index < 2 ? 6.38f : -6.38f);
 
+        public static Vector2 LightFocus(int index) => new Vector2(index % 2 == 0 ? -6f : 6f,
+            index < 2 ? 3.5f : -3.5f);
+
+        /// <summary>Broad projected pool, shared with PointPassFloodlights.cginc.</summary>
+        public static float PoolAt(Vector2 pitchPosition, int index)
+        {
+            Vector2 delta = pitchPosition - LightFocus(index);
+            delta = new Vector2(delta.x / 5.8f, delta.y / 4.1f);
+            return Mathf.Exp(-delta.sqrMagnitude);
+        }
+
         public void Build(Material material)
         {
             PresentationMesh towers = new PresentationMesh();
@@ -28,11 +39,11 @@ namespace PointPass.Gameplay
                 towers.Origin = position; glows.Origin = position;
                 Tower(towers, glows);
                 Vector2 lamp=position+Vector2.up*0.68f;
-                Vector2 target=new Vector2(Mathf.Sign(position.x)*6,Mathf.Sign(position.y)*3);
+                Vector2 target=LightFocus(i);
                 Vector2 width=Vector2.Perpendicular((target-lamp).normalized)*1.3f;
-                beams.GradientTriangle(lamp,target-width,target+width,new Color(0.91f,0.93f,0.84f,0.065f),new Color(0.91f,0.93f,0.84f,0));
-                illumination.Ellipse(new Vector2(Mathf.Sign(position.x)*5, Mathf.Sign(position.y)*2),
-                    new Vector2(5, 4), new Color(0.93f, 0.94f, 0.84f, 0.025f), true, 48);
+                beams.GradientTriangle(lamp,target-width,target+width,new Color(0.78f,0.87f,1f,0.035f),new Color(0.78f,0.87f,1f,0));
+                illumination.Ellipse(target,
+                    new Vector2(5.8f, 4.1f), new Color(0.86f, 0.92f, 1f, 0.025f), true, 48);
             }
             for (int i = 0; i < BroadcastCameraCount; i++)
             {
@@ -50,12 +61,12 @@ namespace PointPass.Gameplay
             illumination.Build(transform, "PitchIllumination", material, -9);
             glows.Build(transform, "LampBloom", material, 3);
             atmosphericBeams=beams.Build(transform,"AtmosphericBeams",material,-7);
-            SetHaze(0); // Clear weather: light on the turf, no theatrical beams in clean air.
+            SetHaze(0.3f); // A little evening haze reveals restrained beams; opaque lamps alone do not light turf.
         }
 
         public void SetHaze(float density)
         {
-            Haze=Mathf.Clamp01(density);
+            Haze=float.IsNaN(density) || float.IsInfinity(density) ? 0f : Mathf.Clamp01(density);
             if (atmosphericBeams!=null) atmosphericBeams.enabled=Haze>0.2f;
         }
 

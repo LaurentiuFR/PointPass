@@ -17,7 +17,7 @@ namespace PointPass.Gameplay
             float angle = Rotation * Mathf.Deg2Rad;
             vertices.Add(Origin + new Vector2(point.x * Mathf.Cos(angle) - point.y * Mathf.Sin(angle),
                 point.x * Mathf.Sin(angle) + point.y * Mathf.Cos(angle)));
-            colors.Add(color);
+            colors.Add(PointPass.Core.MatchPalette.WorldColor(color));
         }
 
         public void Quad(Vector2 center, Vector2 size, Color color)

@@ -5,85 +5,150 @@ using UnityEngine.UI;
 
 namespace PointPass.UI
 {
-    /// <summary>Replays recorded positions on an isolated pitch; never moves live match objects.</summary>
+    /// <summary>Isolated world replay, driven by one unscaled playback clock.</summary>
     public class GoalReplayView : MonoBehaviour
     {
+        private static readonly float[] Speeds = { 0.5f, 1f, 1.5f, 2f };
         private GoalReplayClip clip;
-        private RectTransform field,ball;
-        private RectTransform[] actors;
+        private GoalReplayWorld world;
+        private RawImage viewport;
+        private RenderTexture texture;
         private float playhead;
-        private Material turfMaterial;
+        private readonly Image[] speedImages = new Image[4];
+        private readonly Text[] speedLabels = new Text[4];
+        private Text arrowLabel, phaseLabel;
+        private Image arrowImage;
+        private bool showArrow;
         public float PlaybackTime => playhead;
+        public float PlaybackSpeed { get; private set; } = 1f;
+        public bool ShowShotArrow => showArrow;
+        public GoalReplayWorld World => world;
 
         public void Build()
         {
-            field=Rect("ReplayPitch",transform,new Vector2(0,0),new Vector2(1060,580));
-            Image ground=field.gameObject.AddComponent<Image>();
-            ground.sprite=SpriteLibrary.Get("grass_stadium"); ground.color=Color.white;
-            Shader shader=Resources.Load<Shader>("Art/NaturalTurf");
-            if (shader!=null)
+            viewport = Rect("ReplayViewport", transform, new Vector2(0, 35), new Vector2(1180, 550)).gameObject.AddComponent<RawImage>();
+            viewport.raycastTarget = false; viewport.color = Color.white;
+            Label("ReplayLabel", transform, "GOAL HIGHLIGHT", 28, new Vector2(-370, 348), new Vector2(440, 50), MatchPalette.Paper);
+            phaseLabel = Label("ReplayPhase", transform, "BUILD-UP", 20, new Vector2(420, 348), new Vector2(340, 45), MatchPalette.Accent);
+            Label("SpeedCaption", transform, "PLAYBACK", 17, new Vector2(-495, -273), new Vector2(170, 50), MatchPalette.Muted);
+            for (int i = 0; i < Speeds.Length; i++)
             {
-                turfMaterial=new Material(shader); turfMaterial.SetFloat("_UIReplay",1);
-                ground.material=turfMaterial;
+                int index = i;
+                Button button = Button("Speed" + i, new Vector2(-350 + i * 115, -273), new Vector2(106, 50),
+                    Speeds[i].ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + "×", () => SetPlaybackSpeed(Speeds[index]));
+                speedImages[i] = button.GetComponent<Image>(); speedLabels[i] = button.GetComponentInChildren<Text>();
             }
-            RectTransform markings=Rect("Markings",field,Vector2.zero,new Vector2(580,1060));
-            markings.localRotation=Quaternion.Euler(0,0,90);
-            FootballGraphic pitchGraphic=markings.gameObject.AddComponent<FootballGraphic>();
-            pitchGraphic.raycastTarget=false; pitchGraphic.ShowRoute=false;
-            ball=Image("ReplayBall",field,SpriteLibrary.Get("ball_polished"),Vector2.one*27).rectTransform;
-            SharpText label=Rect("ReplayLabel",transform,new Vector2(0,340),new Vector2(1000,52)).gameObject.AddComponent<SharpText>();
-            label.font=Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"); label.fontSize=32; label.fontStyle=FontStyle.Bold;
-            label.color=MatchPalette.Paper; label.alignment=TextAnchor.MiddleCenter; label.text="THE BUILD-UP. THE FINISH. YOUR MOMENT.";
-            label.raycastTarget=false;
+            Button arrow = Button("ShowShotArrow", new Vector2(355, -273), new Vector2(360, 50), "[ ] SHOW SHOT ARROW", () => SetShowShotArrow(!showArrow));
+            arrowLabel = arrow.GetComponentInChildren<Text>();
+            arrowImage = arrow.GetComponent<Image>();
+            RefreshControls();
         }
 
         public void Play(GoalReplayClip replay)
         {
-            clip=replay; playhead=0;
-            if (actors!=null) foreach (RectTransform actor in actors) Destroy(actor.gameObject);
-            actors=new RectTransform[clip.teams.Length];
-            for (int i=0;i<actors.Length;i++)
-            {
-                string name=clip.teams[i]==Team.Blue ? "player_blue_rigged":"player_red_rigged";
-                Image actor=Image("ReplayPlayer"+i,field,SpriteLibrary.Get(name),Vector2.one*50);
-                actor.material=SpriteLibrary.KitMaterial(clip.teams[i]); actors[i]=actor.rectTransform;
-            }
-            ball.SetAsLastSibling(); Advance(0);
+            if (!GoalReplayRecorder.IsValid(replay)) return;
+            clip = replay; playhead = 0; PlaybackSpeed = 1; showArrow = false;
+            ReleaseWorld();
+            // Match the actual display density, capped at native 1080p for mobile cost.
+            Canvas canvas = GetComponentInParent<Canvas>();
+            float density = canvas != null ? Mathf.Max(1, canvas.scaleFactor) : 1;
+            int width = Mathf.Clamp(Mathf.CeilToInt(1180 * density), 1180, 1920);
+            int height = Mathf.CeilToInt(width * 550f / 1180f);
+            texture = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32)
+                { name = "Goal replay native scene", antiAliasing = 4, filterMode = FilterMode.Bilinear, useMipMap = false };
+            texture.Create(); viewport.texture = texture;
+            world = new GameObject("Isolated Goal Replay", typeof(GoalReplayWorld)).GetComponent<GoalReplayWorld>();
+            world.Build(clip, texture); world.gameObject.SetActive(isActiveAndEnabled);
+            RefreshControls(); Present();
         }
 
         private void Update() => Advance(Time.unscaledDeltaTime);
         public void Advance(float seconds)
         {
-            if (clip?.frames==null || clip.frames.Length<2) return;
-            playhead=Mathf.Repeat(playhead+seconds,clip.Duration+0.65f);
-            float time=clip.frames[0].time+Mathf.Min(playhead,clip.Duration);
-            int next=1;
-            while (next<clip.frames.Length-1 && clip.frames[next].time<time) next++;
-            GoalReplayClip.Frame a=clip.frames[next-1], b=clip.frames[next];
-            float t=Mathf.InverseLerp(a.time,b.time,time);
-            ball.anchoredPosition=Map(Vector2.Lerp(a.ball,b.ball,t));
-            for (int i=0;i<actors.Length;i++)
+            if (clip == null || world == null || seconds < 0 || float.IsNaN(seconds) || float.IsInfinity(seconds)) return;
+            // Hold the final celebration frame briefly, then start the same continuous clip.
+            playhead = Mathf.Repeat(playhead + seconds * PlaybackSpeed, clip.Duration + 0.8f);
+            Present();
+        }
+        public void SetPlaybackSpeed(float speed)
+        {
+            foreach (float allowed in Speeds)
+                if (Mathf.Approximately(speed, allowed)) { PlaybackSpeed = allowed; RefreshControls(); return; }
+        }
+        public void SetShowShotArrow(bool visible) { showArrow = visible; RefreshControls(); Present(); }
+        private void Present()
+        {
+            if (clip == null || world == null) return;
+            float time = clip.frames[0].time + Mathf.Min(playhead, clip.Duration);
+            world.Present(time, showArrow);
+            if (phaseLabel != null) phaseLabel.text = time < clip.goalTime ? "BUILD-UP  /  " + PlaybackSpeed.ToString("0.#") + "×"
+                : "GOAL + CELEBRATION  /  " + PlaybackSpeed.ToString("0.#") + "×";
+        }
+        private void RefreshControls()
+        {
+            for (int i = 0; i < speedImages.Length; i++)
             {
-                actors[i].anchoredPosition=Map(Vector2.Lerp(a.players[i],b.players[i],t));
-                actors[i].localRotation=Quaternion.Euler(0,0,Mathf.LerpAngle(a.angles[i],b.angles[i],t));
+                bool selected = Mathf.Approximately(PlaybackSpeed, Speeds[i]);
+                if (speedImages[i] != null) speedImages[i].color = selected ? MatchPalette.Accent : MatchPalette.Surface;
+                if (speedLabels[i] != null) speedLabels[i].color = selected ? MatchPalette.Ink : MatchPalette.Paper;
             }
+            if (arrowLabel != null) arrowLabel.text = (showArrow ? "[✓] " : "[ ] ") + "SHOW SHOT ARROW";
+            if (arrowImage != null) arrowImage.color = showArrow ? MatchPalette.Accent : MatchPalette.Surface;
+            if (arrowLabel != null) arrowLabel.color = showArrow ? MatchPalette.Ink : MatchPalette.Paper;
         }
-
-        private static Vector2 Map(Vector2 world) => new Vector2(world.x*46f,world.y*46f);
-        private static RectTransform Rect(string name,Transform parent,Vector2 position,Vector2 size)
+        private Button Button(string name, Vector2 position, Vector2 size, string text, UnityEngine.Events.UnityAction action)
         {
-            RectTransform rect=new GameObject(name,typeof(RectTransform)).GetComponent<RectTransform>();
-            rect.SetParent(parent,false); rect.anchoredPosition=position; rect.sizeDelta=size; return rect;
+            RectTransform rect = Rect(name, transform, position, size);
+            Image image = rect.gameObject.AddComponent<Image>(); image.sprite = SpriteLibrary.WhiteSquare();
+            image.type = Image.Type.Simple; image.color = MatchPalette.Surface;
+            Button button = rect.gameObject.AddComponent<MenuButton>(); button.targetGraphic = image;
+            ColorBlock colors = button.colors; colors.highlightedColor = new Color(1.15f, 1.15f, 1.15f); colors.selectedColor = colors.highlightedColor;
+            colors.pressedColor = new Color(0.75f, 0.8f, 0.85f); button.colors = colors;
+            Label("Label", rect, text, 19, Vector2.zero, size - new Vector2(12, 4), MatchPalette.Paper);
+            button.onClick.AddListener(() => { if (isActiveAndEnabled) action(); });
+            return button;
         }
-        private static Image Image(string name,Transform parent,Sprite sprite,Vector2 size)
+        private static Text Label(string name, Transform parent, string text, int size, Vector2 position, Vector2 dimensions, Color color)
         {
-            Image image=Rect(name,parent,Vector2.zero,size).gameObject.AddComponent<Image>();
-            image.sprite=sprite; image.raycastTarget=false; return image;
+            SharpText label = Rect(name, parent, position, dimensions).gameObject.AddComponent<SharpText>();
+            label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"); label.fontSize = size;
+            label.fontStyle = FontStyle.Bold; label.alignment = TextAnchor.MiddleCenter; label.color = color;
+            label.text = text; label.raycastTarget = false; return label;
         }
+        private static RectTransform Rect(string name, Transform parent, Vector2 position, Vector2 size)
+        {
+            RectTransform rect = new GameObject(name, typeof(RectTransform)).GetComponent<RectTransform>();
+            rect.SetParent(parent, false); rect.anchoredPosition = position; rect.sizeDelta = size; return rect;
+        }
+        private void OnEnable()
+        {
+            MatchPalette.AccentChanged += OnAccentChanged;
+            OnAccentChanged(MatchPalette.Accent, MatchPalette.Accent);
+            if (world != null) { world.Camera.enabled = true; world.gameObject.SetActive(true); }
+        }
+        private void OnDisable()
+        {
+            MatchPalette.AccentChanged -= OnAccentChanged;
+            if (world != null) { world.Camera.enabled = false; world.gameObject.SetActive(false); }
+        }
+        private void OnAccentChanged(Color previous, Color next)
+        {
+            if (this == null) { MatchPalette.AccentChanged -= OnAccentChanged; return; }
+            RefreshControls();
+            if (phaseLabel != null) phaseLabel.color = next;
+            world?.RefreshAccent();
+        }
+        private void ReleaseWorld()
+        {
+            if (world != null) { world.gameObject.SetActive(false); Release(world.gameObject); world = null; }
+            if (texture != null) { texture.Release(); Release(texture); texture = null; }
+            if (viewport != null) viewport.texture = null;
+        }
+        private static void Release(Object resource) { if (Application.isPlaying) Destroy(resource); else DestroyImmediate(resource); }
         private void OnDestroy()
         {
-            if (turfMaterial==null) return;
-            if (Application.isPlaying) Destroy(turfMaterial); else DestroyImmediate(turfMaterial);
+            MatchPalette.AccentChanged -= OnAccentChanged;
+            ReleaseWorld();
         }
     }
 }

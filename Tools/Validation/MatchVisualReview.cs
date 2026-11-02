@@ -25,6 +25,7 @@ namespace PointPass.Validation
         private static int sampleFrames,skipFrames;
         private static float goalStarted;
         private static bool flashCaptured;
+        private static bool reactionVerified;
         private static Vector2 pausedPosition;
         private static string Folder => Path.GetFullPath(Path.Combine(Application.dataPath,"../../MatchVisualReview"));
         private static string Report => Path.Combine(Folder,"review.txt");
@@ -45,7 +46,15 @@ namespace PointPass.Validation
             EditorApplication.EnterPlaymode();
         }
 
-        private static T Find<T>() where T:UnityEngine.Object => UnityEngine.Object.FindFirstObjectByType<T>(FindObjectsInactive.Include);
+        private static T Find<T>() where T:UnityEngine.Object
+        {
+            foreach (T item in UnityEngine.Object.FindObjectsByType<T>(FindObjectsInactive.Include, FindObjectsSortMode.InstanceID))
+            {
+                if (item is Component component && component.GetComponentInParent<GoalReplayWorld>(true) != null) continue;
+                return item;
+            }
+            return null;
+        }
         private static T Read<T>(object target,string field) => (T)target.GetType().GetField(field,BindingFlags.Instance|BindingFlags.NonPublic).GetValue(target);
         private static void Set(object target,string field,object value) => target.GetType().GetField(field,BindingFlags.Instance|BindingFlags.NonPublic).SetValue(target,value);
         private static void Check(bool result,string message)
@@ -139,7 +148,7 @@ namespace PointPass.Validation
                         Stage(3); break;
                     case 3:
                         if (Read<int>(manager,"blueScore")!=1) return;
-                        goalStarted=Time.time; flashCaptured=false; Stage(4); break;
+                        goalStarted=Time.time; flashCaptured=false; reactionVerified=false; Stage(4); break;
                     case 4:
                         if (!flashCaptured && Find<StadiumPhotographers>().PeakIntensity>0.35f)
                         {
@@ -148,8 +157,10 @@ namespace PointPass.Validation
                             flashCaptured=true;
                         }
                         if (Time.time-goalStarted<1.2f) return;
-                        Check(flashCaptured && Find<StadiumCrowd>().IsCelebrating && player.GetComponent<PlayerAnimator>().IsCelebrating,
+                        if (!reactionVerified) Check(flashCaptured && Find<StadiumCrowd>().IsCelebrating && player.GetComponent<PlayerAnimator>().IsCelebrating,
                             "Actual charged goal coordinates photographers, supporters and scorer emote");
+                        reactionVerified=true;
+                        if (recorder.Latest==null || !recorder.SavedToDisk) return;
                         Check(recorder.Latest!=null && recorder.SavedToDisk && recorder.Latest.Duration>1,
                             "Goal capture produces a playable, locally saved replay with the build-up and finish");
                         Capture("replay-saved.png",1920,1080,Find<MatchHud>().GetComponent<Canvas>());
@@ -160,6 +171,21 @@ namespace PointPass.Validation
                         Capture("goal-replay.png",1920,1080,menu.GetComponent<Canvas>());
                         Check(menu.CurrentScreen==MatchMenu.Screen.Replay && Time.timeScale==0 && player.Body.position==pausedPosition,
                             "Replay animates independently while live match physics remains paused");
+                        GoalReplayView replayView=Find<GoalReplayView>();
+                        float replayStart=recorder.Latest.frames[0].time;
+                        replayView.SetPlaybackSpeed(2f); replayView.SetShowShotArrow(true);
+                        float strike=recorder.Latest.shots[recorder.Latest.shots.Length-1].time-replayStart+0.05f;
+                        replayView.Advance(Mathf.Max(0,strike-replayView.PlaybackTime)/2f);
+                        replayView.World.Camera.Render();
+                        Capture("replay-strike.png",1920,1080,menu.GetComponent<Canvas>());
+                        Check(replayView.World.ShotArrowVisible && replayView.PlaybackSpeed==2,
+                            "Actual recorded strike displays the optional arrow at 2x playback");
+                        float celebration=recorder.Latest.goalTime-replayStart+0.65f;
+                        replayView.Advance(Mathf.Max(0,celebration-replayView.PlaybackTime)/2f);
+                        replayView.World.Camera.Render();
+                        Capture("replay-celebration.png",1920,1080,menu.GetComponent<Canvas>());
+                        Check(player.Body.position==pausedPosition && Time.timeScale==0,
+                            "Replay goal and celebration preserve the paused live player and clock");
                         Check(menu.TryBack() && menu.CurrentScreen==MatchMenu.Screen.Pause,"Replay Back returns to the pause menu");
                         manager.ResumeMatch(); Stage(6); break;
                     case 6:

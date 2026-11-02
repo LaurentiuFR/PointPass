@@ -30,6 +30,7 @@ namespace PointPass.Validation
                 check(photographers.PeakIntensity==0 && Shader.GetGlobalVector("_PointPassFlash")==Vector4.zero,
                     "Reset clears flash reflections without changing sustained stadium lighting");
                 StadiumFixtures fixtures=root.GetComponentInChildren<StadiumFixtures>();
+                fixtures.SetHaze(0);
                 check(!fixtures.transform.Find("AtmosphericBeams").GetComponent<MeshRenderer>().enabled,
                     "Clear conditions show illuminated turf without visible light beams");
                 fixtures.SetHaze(0.5f);
@@ -61,9 +62,9 @@ namespace PointPass.Validation
                 recorder.BeginGoal(Team.Blue); recorder.SetRecording(false);
                 recorder.Advance(0);
                 check(recorder.Latest==null,"Replay capture does not claim a saved highlight before the post-goal tail completes");
-                for (int i=0;i<22;i++) recorder.Advance(0.05f);
+                for (int i=0;i<65;i++) recorder.Advance(0.05f);
                 GoalReplayClip clip=recorder.Latest;
-                check(clip!=null && clip.frames.Length<=120 && clip.Duration>4,
+                check(clip!=null && clip.frames.Length<=GoalReplayRecorder.Capacity && clip.Duration>7,
                     "Replay contains bounded pre-goal history and the ball's post-goal finish");
                 check(recorder.SavedToDisk && File.Exists(Path.Combine(recorder.SaveDirectory,"last-goal.json")),
                     "Replay saved cue is backed by an actual local clip file");

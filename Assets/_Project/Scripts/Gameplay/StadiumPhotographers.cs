@@ -6,6 +6,7 @@ namespace PointPass.Gameplay
     /// <summary>Photographer flashes and brief local surface reflections; stadium lights remain constant.</summary>
     public class StadiumPhotographers : MonoBehaviour
     {
+        public bool AffectGlobalLighting { get; set; } = true;
         private readonly SpriteRenderer[] flashes=new SpriteRenderer[12];
         private readonly SpriteRenderer[] reflections=new SpriteRenderer[12];
         private readonly Vector2[] positions=new Vector2[12];
@@ -59,7 +60,7 @@ namespace PointPass.Gameplay
                 reflections[i].color=new Color(0.8f,0.89f,1,pulse*0.13f);
                 if (pulse>PeakIntensity) { PeakIntensity=pulse; peakPoint=positions[i]; }
             }
-            Shader.SetGlobalVector("_PointPassFlash",new Vector4(peakPoint.x,peakPoint.y,PeakIntensity,0));
+            if (AffectGlobalLighting) Shader.SetGlobalVector("_PointPassFlash",new Vector4(peakPoint.x,peakPoint.y,PeakIntensity,0));
         }
 
         public void ResetFlashes()
@@ -67,7 +68,7 @@ namespace PointPass.Gameplay
             age=10; PeakIntensity=0;
             foreach (SpriteRenderer sprite in flashes) if (sprite!=null) sprite.color=Color.clear;
             foreach (SpriteRenderer sprite in reflections) if (sprite!=null) sprite.color=Color.clear;
-            Shader.SetGlobalVector("_PointPassFlash",Vector4.zero);
+            if (AffectGlobalLighting) Shader.SetGlobalVector("_PointPassFlash",Vector4.zero);
         }
         private void OnDestroy() { ResetFlashes(); PresentationMesh.ReleaseMeshes(transform); }
     }

@@ -6,6 +6,7 @@ namespace PointPass.Gameplay
     public class TurfSurface : MonoBehaviour
     {
         private Material material;
+        public float Wetness { get; private set; }
 
         public void Init(SpriteRenderer surface)
         {
@@ -14,6 +15,16 @@ namespace PointPass.Gameplay
             material = new Material(shader) { name = "Natural muted turf" };
             surface.sharedMaterial = material;
             surface.color = Color.white;
+            material.SetVector("_StadiumOrigin", surface.transform.parent != null
+                ? surface.transform.parent.position : Vector3.zero);
+            SetWetness(0f);
+        }
+
+        /// <summary>Presentation parameter only; dry is the default and does not change ball physics.</summary>
+        public void SetWetness(float wetness)
+        {
+            Wetness = float.IsNaN(wetness) || float.IsInfinity(wetness) ? 0f : Mathf.Clamp01(wetness);
+            if (material != null) material.SetFloat("_Wetness", Wetness);
         }
 
         private void OnDestroy()

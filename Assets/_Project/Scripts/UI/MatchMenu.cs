@@ -14,11 +14,11 @@ namespace PointPass.UI
     {
         public enum Screen { Main, Pause, Results, Controls, Replay }
 
-        private static readonly Color Ink = MatchPalette.Ink;
-        private static readonly Color Surface = MatchPalette.Surface;
-        private static readonly Color Paper = MatchPalette.Paper;
-        private static readonly Color Muted = MatchPalette.Muted;
-        private static readonly Color Mint = MatchPalette.Accent;
+        private static Color Ink => MatchPalette.Ink;
+        private static Color Surface => MatchPalette.Surface;
+        private static Color Paper => MatchPalette.Paper;
+        private static Color Muted => MatchPalette.Muted;
+        private static Color Mint => MatchPalette.Accent;
         private static Sprite roundedSprite;
         private static Sprite ringSprite;
 
@@ -42,6 +42,7 @@ namespace PointPass.UI
         private Screen replayOrigin;
         private Button pauseReplay;
         private Button resultsReplay;
+        private readonly List<Text> themeLabels = new List<Text>();
 
         public event Action PlayRequested;
         public event Action ResumeRequested;
@@ -56,6 +57,7 @@ namespace PointPass.UI
             GameObject root = new GameObject("MatchMenu", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             Canvas canvas = root.GetComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.pixelPerfect = true;
             canvas.sortingOrder = 100;
             CanvasScaler scaler = root.GetComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
@@ -76,6 +78,8 @@ namespace PointPass.UI
             menu.BuildResults();
             menu.BuildControls();
             menu.BuildReplay();
+            InterfaceTheme.Refresh(menu.transform, new Color(0.718f, 0.957f, 0.2f), Mint);
+            MatchPalette.AccentChanged += menu.OnAccentChanged;
             menu.ApplyLayout();
             menu.Hide();
             return menu;
@@ -93,9 +97,9 @@ namespace PointPass.UI
             if (CurrentScreen != Screen.Main || heroMotion == null) return;
             menuAge += seconds;
             mainEntrance.alpha = Mathf.SmoothStep(0,1,menuAge / 0.45f);
-            heroMotion.anchoredPosition = new Vector2(-27, 39 + Mathf.Sin(menuAge * 1.3f) * 7f);
-            heroMotion.localRotation = Quaternion.Euler(0,0,-28 + Mathf.Sin(menuAge * 0.7f) * 2f);
-            menuBall.anchoredPosition = new Vector2(126 + Mathf.Sin(menuAge * 0.9f) * 10f, 142 + Mathf.Cos(menuAge * 0.9f) * 6f);
+            heroMotion.anchoredPosition = new Vector2(-27, 39 + Mathf.Sin(menuAge * 1.3f) * 4f);
+            heroMotion.localRotation = Quaternion.Euler(0,0,-28 + Mathf.Sin(menuAge * 0.7f) * 1.2f);
+            menuBall.anchoredPosition = new Vector2(126 + Mathf.Sin(menuAge * 0.9f) * 5f, 142 + Mathf.Cos(menuAge * 0.9f) * 4f);
             menuBall.localRotation = Quaternion.Euler(0,0,-menuAge * 9f);
         }
 
@@ -193,15 +197,13 @@ namespace PointPass.UI
         {
             RectTransform page = Page(Screen.Main);
             mainEntrance = page.gameObject.AddComponent<CanvasGroup>();
-            Image matchday = Panel(page,"MatchdayBadge",Surface,new Vector2(-512,335),new Vector2(240,40));
-            Label(matchday.transform,"BadgeText","MATCHDAY  /  POINT PASS",15,Vector2.zero,new Vector2(230,36),Mint,true);
-            Text wordmark = Label(page, "Wordmark", "POINT<color=#CFE697>PASS</color>", 89, new Vector2(-342, 235), new Vector2(600, 110), Paper, true, TextAnchor.MiddleLeft);
-            wordmark.fontStyle = FontStyle.BoldAndItalic;
-            Bar(page,"WordmarkUnderline",new Vector2(-583,177),new Vector2(96,5),MatchPalette.Gold);
+            Image matchday = Panel(page,"MatchdayBadge",Surface,new Vector2(-492,335),new Vector2(280,40));
+            Label(matchday.transform,"BadgeText","MATCHDAY  /  YOUR PITCH",16,Vector2.zero,new Vector2(264,36),Mint,true);
+            Label(page, "Wordmark", "POINT<color=#B7F433>PASS</color>", 89, new Vector2(-342, 235), new Vector2(600, 110), Paper, true, TextAnchor.MiddleLeft);
             Label(page, "Headline", "MAKE EVERY\nPASS COUNT.", 43, new Vector2(-342, 100), new Vector2(580, 125), Paper, true, TextAnchor.MiddleLeft);
             Label(page, "Description", "Play the space. Find your teammate.\nTurn one good pass into a great goal.", 25,
                 new Vector2(-342, -20), new Vector2(580, 90), Muted, false, TextAnchor.MiddleLeft);
-            Button play = ActionButton(page, "PlayOffline", "STEP ONTO THE PITCH    >", new Vector2(-372, -151), new Vector2(520, 88), true,
+            Button play = ActionButton(page, "PlayOffline", "PLAY OFFLINE    >", new Vector2(-372, -151), new Vector2(520, 88), true,
                 () => PlayRequested?.Invoke());
             ActionButton(page, "HowToPlay", "HOW TO PLAY", new Vector2(-372, -257), new Vector2(520, 78), false,
                 () => ShowControls(Screen.Main));
@@ -211,7 +213,9 @@ namespace PointPass.UI
             Image card = Panel(page, "HeroCard", Surface, new Vector2(357, 30), new Vector2(550, 680));
             RectTransform graphic = Rect(card.transform,"TacticalPitch");
             Place(graphic,Vector2.zero,new Vector2(500,615));
-            graphic.gameObject.AddComponent<FootballGraphic>().raycastTarget = false;
+            FootballGraphic football = graphic.gameObject.AddComponent<FootballGraphic>();
+            football.raycastTarget = false;
+            football.ShowRoute = false;
             Label(card.transform, "HeroEyebrow", "THE PITCH IS YOURS", 20, new Vector2(0, 281), new Vector2(470, 40), Mint);
             RectTransform hero = Rect(card.transform, "Hero");
             heroMotion = hero;
@@ -222,9 +226,8 @@ namespace PointPass.UI
             PictureAt(hero, "Player", SpriteLibrary.Get("player_blue_polished"), Color.white, Vector2.zero, new Vector2(330, 330));
             menuBall = PictureAt(card.transform, "Football", SpriteLibrary.Get("ball_polished"), Color.white, new Vector2(133, 151), new Vector2(125, 125)).rectTransform;
             Panel(card.transform,"HeroCaption",Surface,new Vector2(0,-237),new Vector2(500,147));
-            Bar(card.transform, "Accent", new Vector2(0, -190), new Vector2(40, 3), Mint);
             Label(card.transform, "Rules", "TWO HALVES.\nONE GOLDEN CHANCE.", 30, new Vector2(0, -245), new Vector2(460, 90), Paper, true);
-            Label(page, "Footer", "MOVEMENT  /  PASSING  /  SHOOTING", 17, new Vector2(357, -363), new Vector2(550, 32), Muted);
+            BuildThemeButton(page, new Vector2(357, -363), new Vector2(550, 48));
         }
 
         private void BuildPause()
@@ -293,15 +296,41 @@ namespace PointPass.UI
             Label(page, "Eyebrow", "M A K E   Y O U R   M O V E", 19, new Vector2(0, 326), new Vector2(1120, 40), Mint);
             Label(page, "Title", "HOW TO PLAY", 49, new Vector2(0, 252), new Vector2(1120, 80), Paper, true);
             BuildControlColumn(page, "Keyboard", -405, "KEYBOARD",
-                "<color=#CFE697>WASD / ARROWS</color>\nMove and aim\n\n<color=#CFE697>J / K</color>\nHold pass / shoot, release to kick\n\n<color=#CFE697>Q / E WHILE SHOOTING</color>\nBend left / right\n\n<color=#CFE697>SHIFT / ESC / P</color>\nSprint / cancel / pause");
+                "<color=#B7F433>WASD / ARROWS</color>\nMove and aim\n\n<color=#B7F433>J / K</color>\nHold pass / shoot, release to kick\n\n<color=#B7F433>Q / E WHILE SHOOTING</color>\nBend left / right\n\n<color=#B7F433>SHIFT / ESC / P</color>\nSprint / cancel / pause");
             BuildControlColumn(page, "Touch", 0, "TOUCH",
-                "<color=#CFE697>LEFT JOYSTICK</color>\nMove and aim\n\n<color=#CFE697>PASS / SHOOT</color>\nHold to charge, release to kick\n\n<color=#CFE697>FLICK FROM SHOOT</color>\nFlick sideways as you release\nto bend toward that side\n\n<color=#CFE697>SPRINT / PAUSE</color>\nRun faster / take a break");
+                "<color=#B7F433>LEFT JOYSTICK</color>\nMove and aim\n\n<color=#B7F433>PASS / SHOOT</color>\nHold to charge, release to kick\n\n<color=#B7F433>FLICK FROM SHOOT</color>\nFlick sideways as you release\nto bend toward that side\n\n<color=#B7F433>SPRINT / PAUSE</color>\nRun faster / take a break");
             BuildControlColumn(page, "Gamepad", 405, "GAMEPAD",
-                "<color=#CFE697>LEFT STICK</color>\nMove and aim\n\n<color=#CFE697>SOUTH / EAST</color>\nHold pass / shoot, release to kick\n\n<color=#CFE697>RIGHT STICK</color>\nBend a shot toward that side\n\n<color=#CFE697>RB / NORTH / START</color>\nSprint / cancel / pause");
-            Button back = ActionButton(page, "Back", "BACK", new Vector2(0, -319), new Vector2(400, 72), false,
+                "<color=#B7F433>LEFT STICK</color>\nMove and aim\n\n<color=#B7F433>SOUTH / EAST</color>\nHold pass / shoot, release to kick\n\n<color=#B7F433>RIGHT STICK</color>\nBend a shot toward that side\n\n<color=#B7F433>RB / NORTH / START</color>\nSprint / cancel / pause");
+            Button back = ActionButton(page, "Back", "BACK", new Vector2(-330, -319), new Vector2(400, 72), false,
                 () => Show(controlsOrigin));
+            BuildThemeButton(page, new Vector2(245, -319), new Vector2(600, 72));
             firstButtons.Add(Screen.Controls, back);
         }
+
+        private void BuildThemeButton(Transform page, Vector2 position, Vector2 size)
+        {
+            Button button = ActionButton(page, "ColourScheme", "", position, size, false,
+                () => MatchPalette.SetTheme((MatchPalette.InterfaceTheme)(((int)MatchPalette.Theme + 1) % 3)));
+            Text label = button.GetComponentInChildren<Text>();
+            label.fontSize = 19;
+            themeLabels.Add(label);
+            RefreshThemeLabels();
+        }
+
+        private void RefreshThemeLabels()
+        {
+            foreach (Text label in themeLabels)
+                label.text = "COLOURS: NAVY + " + MatchPalette.ThemeName + "    >";
+        }
+
+        private void OnAccentChanged(Color previous, Color accent)
+        {
+            if (this == null) { MatchPalette.AccentChanged -= OnAccentChanged; return; }
+            InterfaceTheme.Refresh(transform, previous, accent);
+            RefreshThemeLabels();
+        }
+
+        private void OnDestroy() => MatchPalette.AccentChanged -= OnAccentChanged;
 
         private static void BuildControlColumn(Transform parent, string name, float x, string title, string body)
         {
@@ -368,8 +397,9 @@ namespace PointPass.UI
         {
             Image image = Rect(parent, name).gameObject.AddComponent<Image>();
             image.sprite = sprite; image.color = color; image.raycastTarget = false;
-            if (sprite != null && sprite.texture.name.StartsWith("player_"))
-                image.material = SpriteLibrary.KitMaterial(sprite.texture.name.Contains("_red") ? Team.Red : Team.Blue);
+            // World kit shaders do not implement Canvas clipping or UI tint semantics.
+            // The menu uses the source sprite with Unity's UI material so skin and fabric
+            // shading remain faithful and the hero does not pick up stadium illumination.
             return image;
         }
 

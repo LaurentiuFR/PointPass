@@ -77,7 +77,7 @@ namespace PointPass.Core
             if (cam.GetComponent<CameraFit>() == null) cam.gameObject.AddComponent<CameraFit>();
         }
 
-        private static Ball CreateBall(Transform root)
+        internal static Ball CreateBall(Transform root)
         {
             GameObject go = new GameObject("Ball");
             go.transform.SetParent(root, false);
@@ -100,10 +100,11 @@ namespace PointPass.Core
             go.AddComponent<StadiumShadow>().Init(0.4f, 0.12f, 2);
             SpriteRenderer sprite = SpriteLibrary.Create(go.transform, "Sprite", "ball_polished", ballSize * 1.12f, Vector2.zero, 6, Color.white, true);
             ball.SetVisual(sprite.transform);
+            go.AddComponent<StadiumActorLighting>().Init(root);
             return ball;
         }
 
-        private static PlayerController CreatePlayer(
+        internal static PlayerController CreatePlayer(
             Transform root, Team team, Ball ball, PossessionSystem possession, Vector2 kickoffPosition, float kickoffAngle)
         {
             GameObject go = new GameObject("Player");
@@ -150,6 +151,7 @@ namespace PointPass.Core
             PlayerKicker kicker = go.AddComponent<PlayerKicker>();
             kicker.Init(ball, possession);
             kicker.Kicked += animator.PlayKick;
+            go.AddComponent<StadiumActorLighting>().Init(root);
             return controller;
         }
 

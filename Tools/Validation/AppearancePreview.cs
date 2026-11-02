@@ -93,8 +93,10 @@ namespace PointPass.Validation
                 player.Body.linearVelocity = Vector2.zero;
                 Call(animator, "ResetPose");
                 player.transform.Find("Sprite").GetComponent<SpriteRenderer>().sprite = SpriteLibrary.Get("player_red_rigged");
+                player.transform.Find("Sprite").GetComponent<SpriteRenderer>().sharedMaterial = SpriteLibrary.KitMaterial(Team.Red);
                 Capture(camera, null, 1200, 900, "../AppearanceVerification/red-player-preview.png");
                 player.transform.Find("Sprite").GetComponent<SpriteRenderer>().sprite = SpriteLibrary.Get("player_blue_rigged");
+                player.transform.Find("Sprite").GetComponent<SpriteRenderer>().sharedMaterial = SpriteLibrary.KitMaterial(Team.Blue);
 
                 player.Body.position = new Vector2(MatchConfig.FieldHalfWidth + 0.5f, 0);
                 player.transform.position = player.Body.position;
@@ -158,10 +160,27 @@ namespace PointPass.Validation
                 MatchMenu menu = UnityEngine.Object.FindFirstObjectByType<MatchMenu>(FindObjectsInactive.Include);
                 menu.ShowMain();
                 menu.AdvanceMotion(0.6f);
+                Capture(camera, menu.GetComponent<Canvas>(), 1280, 720, "../AppearanceVerification/menu-main-720p.png");
                 Capture(camera, menu.GetComponent<Canvas>(), 1920, 1080, "../AppearanceVerification/menu-main.png");
+                MatchPalette.InterfaceTheme savedTheme = MatchPalette.Theme;
+                try
+                {
+                    foreach (MatchPalette.InterfaceTheme theme in System.Enum.GetValues(typeof(MatchPalette.InterfaceTheme)))
+                    {
+                        MatchPalette.SetTheme(theme);
+                        Capture(camera, menu.GetComponent<Canvas>(), 1920, 1080,
+                            "../AppearanceVerification/menu-theme-" + theme + ".png");
+                    }
+                }
+                finally { MatchPalette.SetTheme(savedTheme); }
+                Capture(camera, menu.GetComponent<Canvas>(), 2560, 1440, "../AppearanceVerification/menu-main-1440p.png");
                 Capture(camera, menu.GetComponent<Canvas>(), 1440, 1080, "../AppearanceVerification/menu-main-tablet.png");
+                // Portrait is a layout stress capture only; the game targets landscape play.
+                Capture(camera, menu.GetComponent<Canvas>(), 1080, 1920, "../AppearanceVerification/menu-main-portrait-stress.png");
                 Call(menu, "ShowControls", MatchMenu.Screen.Main);
                 Capture(camera, menu.GetComponent<Canvas>(), 1920, 1080, "../AppearanceVerification/menu-controls.png");
+                Capture(camera, menu.GetComponent<Canvas>(), 1280, 720, "../AppearanceVerification/menu-controls-720p.png");
+                Capture(camera, menu.GetComponent<Canvas>(), 1440, 1080, "../AppearanceVerification/menu-controls-tablet.png");
                 menu.ShowPause();
                 Capture(camera, menu.GetComponent<Canvas>(), 1920, 1080, "../AppearanceVerification/menu-pause.png");
                 menu.ShowResults(2, 1);
@@ -207,6 +226,7 @@ namespace PointPass.Validation
                 MatchMenu menu = canvas.GetComponent<MatchMenu>();
                 if (menu != null) Call(menu, "ApplyLayout");
                 foreach (Graphic graphic in canvas.GetComponentsInChildren<Graphic>()) graphic.Rebuild(CanvasUpdate.PreRender);
+                if (menu != null) CheckMenuBounds(menu, camera, width, height);
             }
             camera.Render();
             RenderTexture previous = RenderTexture.active;
@@ -220,6 +240,22 @@ namespace PointPass.Validation
             UnityEngine.Object.DestroyImmediate(pixels);
             target.Release();
             UnityEngine.Object.DestroyImmediate(target);
+        }
+
+        private static void CheckMenuBounds(MatchMenu menu, Camera camera, int width, int height)
+        {
+            Vector3[] corners = new Vector3[4];
+            foreach (Graphic graphic in menu.GetComponentsInChildren<Graphic>())
+            {
+                if (!(graphic is Text) && graphic.GetComponent<Button>() == null) continue;
+                graphic.rectTransform.GetWorldCorners(corners);
+                foreach (Vector3 corner in corners)
+                {
+                    Vector2 screen = RectTransformUtility.WorldToScreenPoint(camera, corner);
+                    if (screen.x < -1 || screen.x > width + 1 || screen.y < -1 || screen.y > height + 1)
+                        throw new InvalidOperationException($"Menu {menu.CurrentScreen} element {graphic.name} clips at {width}x{height}: {screen}");
+                }
+            }
         }
     }
 }

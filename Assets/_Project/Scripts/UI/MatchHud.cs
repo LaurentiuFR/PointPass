@@ -11,11 +11,11 @@ namespace PointPass.UI
     /// <summary>Runtime match presentation. Gameplay and input remain in their own components.</summary>
     public class MatchHud : MonoBehaviour
     {
-        private static readonly Color Ink = MatchPalette.Ink;
-        private static readonly Color Paper = MatchPalette.Paper;
-        private static readonly Color Muted = MatchPalette.Muted;
-        private static readonly Color Mint = MatchPalette.Accent;
-        private static readonly Color Gold = MatchPalette.Gold;
+        private static Color Ink => MatchPalette.Ink;
+        private static Color Paper => MatchPalette.Paper;
+        private static Color Muted => MatchPalette.Muted;
+        private static Color Mint => MatchPalette.Accent;
+        private static Color Gold => MatchPalette.Gold;
         private static Sprite ringSprite;
         private static Sprite roundedSprite;
 
@@ -68,6 +68,7 @@ namespace PointPass.UI
         {
             GameObject go = new GameObject("HUD", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             go.GetComponent<Canvas>().renderMode = RenderMode.ScreenSpaceOverlay;
+            go.GetComponent<Canvas>().pixelPerfect = true;
             CanvasScaler scaler = go.GetComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920, 1080);
@@ -89,8 +90,17 @@ namespace PointPass.UI
             Label(hud.replayCue.transform,"ReplayStatus","",19,Vector2.zero,new Vector2(470,46),Mint,true);
             hud.replayCue.gameObject.SetActive(false);
             hud.SetPlayerState(false, false, false);
+            MatchPalette.AccentChanged += hud.OnAccentChanged;
             return hud;
         }
+
+        private void OnAccentChanged(Color previous, Color accent)
+        {
+            // Editor fixtures can destroy an inactive component without invoking OnDestroy.
+            if (this == null) { MatchPalette.AccentChanged -= OnAccentChanged; return; }
+            InterfaceTheme.Refresh(transform, previous, accent);
+        }
+        private void OnDestroy() => MatchPalette.AccentChanged -= OnAccentChanged;
 
         private void Update()
         {
@@ -233,7 +243,7 @@ namespace PointPass.UI
         private void BuildActions()
         {
             PassButton = BuildAction("Pass", new Vector2(-338, 170), 168, Mint, 0, out passCharge);
-            ShootButton = BuildAction("Shoot", new Vector2(-158, 314), 184, Gold, 1, out shotCharge);
+            ShootButton = BuildAction("Shoot", new Vector2(-158, 314), 184, Mint, 1, out shotCharge);
             SprintButton = BuildAction("Sprint", new Vector2(-132, 108), 140, Paper, 2, out _);
             // Only opacity changes. Touch ownership and release/cancel events remain intact.
             passAvailability = PassButton.gameObject.AddComponent<CanvasGroup>();
@@ -333,7 +343,7 @@ namespace PointPass.UI
             chargeFill.transform.parent.gameObject.SetActive(charging);
             charge = Mathf.Clamp01(charge);
             chargeFill.fillAmount = charge;
-            chargeFill.color = shooting ? Gold : Mint;
+            chargeFill.color = Mint;
             passCharge.fillAmount = type == PlayerKicker.KickType.Pass ? charge : 0;
             shotCharge.fillAmount = shooting ? charge : 0;
             if (shooting && Mathf.Abs(curve) > 0.1f)

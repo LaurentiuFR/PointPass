@@ -7,7 +7,7 @@ namespace PointPass.UI
     /// <summary>Resolution-independent pitch graphics with feathered line edges, no low-res texture.</summary>
     public class FootballGraphic : Image
     {
-        public bool ShowRoute { get; set; } = true;
+        public bool ShowRoute { get; set; }
         protected override void OnEnable()
         {
             base.OnEnable();
@@ -19,7 +19,8 @@ namespace PointPass.UI
             mesh.Clear();
             Rect r = rectTransform.rect;
             Vector2 half = r.size * 0.43f;
-            Color paint = new Color(0.81f, 0.9f, 0.7f, 0.23f);
+            Color paint = MatchPalette.Accent;
+            paint.a = 0.14f;
             Stroke(mesh, new Vector2(-half.x,-half.y),new Vector2(half.x,-half.y),1.5f,paint);
             Stroke(mesh, new Vector2(half.x,-half.y),half,1.5f,paint);
             Stroke(mesh, half,new Vector2(-half.x,half.y),1.5f,paint);

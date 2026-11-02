@@ -10,12 +10,12 @@ $validationRoot = Join-Path $repositoryRoot 'Logs/PR2Validation'
 $reportRoot = Join-Path $repositoryRoot 'Logs/PR2Verification'
 New-Item -ItemType Directory -Force -Path "$validationRoot/Assets/Scripts", "$validationRoot/Assets/Editor", "$validationRoot/Packages", "$validationRoot/ProjectSettings", $reportRoot | Out-Null
 New-Item -ItemType Directory -Force -Path "$validationRoot/Assets/Resources/Art" | Out-Null
-Get-ChildItem "$repositoryRoot/Assets/_Project/Resources/Art" -Filter '*.shader' | Copy-Item -Destination "$validationRoot/Assets/Resources/Art"
+Get-ChildItem "$repositoryRoot/Assets/_Project/Resources/Art" -File |
+    Where-Object { $_.Extension -in @('.shader', '.cginc') } | Copy-Item -Destination "$validationRoot/Assets/Resources/Art"
 
 # Copy source only. Unity generates metadata inside the disposable project.
-# Excluding the bootstrap prevents the normal match from starting in this test project.
+# The editor-only harness does not enter Play Mode; include actor factories used by replay.
 Get-ChildItem "$repositoryRoot/Assets/_Project/Scripts" -Recurse -Filter '*.cs' |
-    Where-Object { $_.Name -ne 'MatchBootstrap.cs' } |
     Copy-Item -Destination "$validationRoot/Assets/Scripts"
 Copy-Item "$PSScriptRoot/PR2Validation.cs" "$validationRoot/Assets/Editor/PR2Validation.cs"
 Copy-Item "$PSScriptRoot/InputFeelValidation.cs" "$validationRoot/Assets/Editor/InputFeelValidation.cs"
@@ -29,6 +29,9 @@ Copy-Item "$PSScriptRoot/StadiumValidation.cs" "$validationRoot/Assets/Editor/St
 Copy-Item "$PSScriptRoot/GoalPresentationValidation.cs" "$validationRoot/Assets/Editor/GoalPresentationValidation.cs"
 Copy-Item "$PSScriptRoot/MatchDayValidation.cs" "$validationRoot/Assets/Editor/MatchDayValidation.cs"
 Copy-Item "$PSScriptRoot/GoalMomentValidation.cs" "$validationRoot/Assets/Editor/GoalMomentValidation.cs"
+Copy-Item "$PSScriptRoot/MenuSharpnessValidation.cs" "$validationRoot/Assets/Editor/MenuSharpnessValidation.cs"
+Copy-Item "$PSScriptRoot/LightingValidation.cs" "$validationRoot/Assets/Editor/LightingValidation.cs"
+Copy-Item "$PSScriptRoot/ReplayValidation.cs" "$validationRoot/Assets/Editor/ReplayValidation.cs"
 Copy-Item "$repositoryRoot/ProjectSettings/ProjectVersion.txt" "$validationRoot/ProjectSettings/ProjectVersion.txt"
 
 # Reuse locally resolved packages; no package downloads or main-project settings changes.
@@ -37,6 +40,7 @@ $dependencies = @{
     'com.unity.modules.ui' = '1.0.0'
     'com.unity.modules.imgui' = '1.0.0'
     'com.unity.modules.jsonserialize' = '1.0.0'
+    'com.unity.modules.audio' = '1.0.0'
 }
 foreach ($packageName in @('com.unity.inputsystem', 'com.unity.ugui')) {
     $package = @(Get-ChildItem "$repositoryRoot/Library/PackageCache" -Directory -Filter "$packageName@*")

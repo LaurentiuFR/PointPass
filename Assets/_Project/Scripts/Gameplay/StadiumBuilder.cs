@@ -50,7 +50,7 @@ namespace PointPass.Gameplay
             Color concourse = MatchPalette.Ink;
             Color runoff = new Color(0.105f, 0.22f, 0.17f);
             Color deck = MatchPalette.Surface;
-            Color aisle = new Color(0.2f, 0.24f, 0.25f);
+            Color aisle = new Color(0.13f, 0.19f, 0.29f);
             Quad(Vector2.zero, new Vector2(28, 18), concourse);
             Quad(Vector2.zero, new Vector2(23.1f, 13.05f), runoff);
             Quad(new Vector2(0, 6.31f), new Vector2(25.6f, 0.22f), aisle);
@@ -59,7 +59,7 @@ namespace PointPass.Gameplay
             Quad(new Vector2(11.21f, 0), new Vector2(0.22f, 12.8f), aisle);
 
             // A low perimeter rail makes the playable grass read as a stadium enclosure.
-            Color rail = new Color(0.68f, 0.75f, 0.7f);
+            Color rail = new Color(0.54f, 0.65f, 0.73f);
             foreach (float sign in new[] { -1f, 1f })
             {
                 Quad(new Vector2(0, sign * 6.08f), new Vector2(20.5f, 0.09f), rail);
@@ -203,7 +203,7 @@ namespace PointPass.Gameplay
 
         private void Vertex(Vector2 point, Color color)
         {
-            vertices.Add(point); colors.Add(color); uv.Add(Vector2.one * 0.5f);
+            vertices.Add(point); colors.Add(MatchPalette.WorldColor(color)); uv.Add(Vector2.one * 0.5f);
         }
 
         private void Commit(string name, int sortingOrder)

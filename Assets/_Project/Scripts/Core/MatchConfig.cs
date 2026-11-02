@@ -32,7 +32,7 @@ namespace PointPass.Core
         public const float HalfTimePauseSeconds = 2.5f;
 
         // Look
-        public static readonly Color Background = new Color(0.09f, 0.27f, 0.13f);
+        public static readonly Color Background = MatchPalette.Ink;
         public static readonly Color BlueTeam = MatchPalette.Blue;
         public static readonly Color RedTeam = MatchPalette.Red;
     }

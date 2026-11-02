@@ -8,11 +8,11 @@ Run from PowerShell after opening PointPass in Unity at least once:
 
 Use `-UnityEditor 'path/to/Unity.exe'` if the editor is installed elsewhere. Use the version in `ProjectSettings/ProjectVersion.txt`.
 
-The script copies current gameplay source into `Logs/PR2Validation`, reuses the installed Input System and uGUI packages, and runs assertions inside Unity in batch mode. It does not edit the main project's scenes, settings or metadata. Reports go to `Logs/PR2Verification/engine-tests.txt` and `unity-validation.log`. These generated directories are ignored by Git. Logs is used because Unity clears Temp when opening the main project.
+The script copies current runtime source, shader includes and validation helpers into `Logs/PR2Validation`, reuses installed Input System/uGUI packages, and runs assertions inside Unity in batch mode. It does not edit the main project's scenes, settings or metadata. The bootstrap factories are included for replay construction; the editor-only harness does not enter Play Mode. Reports go to `Logs/PR2Verification/engine-tests.txt` and `unity-validation.log`. These generated directories are ignored by Git. Logs is used because Unity clears Temp when opening the main project.
 
 Checks cover charged kick powers, immediate/retained aim, ownership, queued execution, cancellation, sprint composition, reversal braking, independent fingers, physical ball travel, reception, wall rebound and synthetic gamepad/keyboard input. The harness explicitly invokes lifecycle/physics methods in an isolated editor scene; charge time is injected to cover minimum, intermediate and maximum values reproducibly.
 
-This is engine-level validation, not a Play Mode or device test. It does not establish frame-by-frame match flow, input latency, real touchscreen behavior or gameplay feel. The normal match bootstrap is excluded intentionally. Test those in the real project before merging.
+This is engine-level validation, not a Play Mode or device test. It does not establish frame-by-frame match flow, input latency, real touchscreen behavior or gameplay feel. Use the Play Mode checks and the real project before merging.
 
 Additional helpers validate bounded turning, completing turns after stick release, kick-animation isolation, ball trails/reset, presentation event ordering and menu/pause/input/navigation contracts. Inspect `engine-tests.txt` for the current assertion count and results.
 
@@ -29,6 +29,10 @@ Match-day previews include `floodlight-preview.png`, `broadcast-camera-preview.p
 Run `./Tools/Validation/Render-AppearancePreview.ps1 -ReviewMatch` for a graphics-enabled Play Mode review. It uses the real bootstrap, menu, moving/jogging/sprinting player, a charged shot, both teams' goal reactions, scorer/own-goal attribution, saved replay, pause/back/resume and kickoff. It captures the UI at 1280x720, 1920x1080 and 2560x1440, plus gameplay, flashes, scorer emote, replay and haze. Outputs and `review.txt` are in `Logs/MatchVisualReview`. Frame-time and GC samples are taken during the running match, after warm-up and excluding screenshot frames. The report records the actual editor game-view resolution separately from the screenshot resolutions; editor timing includes editor overhead and is not a phone benchmark.
 
 Goal-moment engine checks additionally cover opposite supporter reactions, team-section confetti, local flash/reset/pause, haze-only beams, bounded replay history, actual clip persistence and restore, replay isolation, and scorer-pose reset. JSON serialization is included in both disposable projects to exercise the real save path.
+
+Replay checks now cover complete factory-built world presentation, disabled physics, recorded articulated poses/ball rotation, real strike-event capture, the full celebration tail, all four playback speeds, independent arrow controls and camera shutdown. Theme tests cover persistence, live HUD/menu updates and unchanged replay settings. Lighting tests cover matching fixture pools, replay origins, directed shadows and dry/wet material state.
+
+The appearance renderer also exports all three colour schemes plus menu/controls layouts at 720p, 1080p, 1440p and tablet aspect ratios, with a portrait layout stress capture. Visible label/button bounds are checked during capture. The disposable project uses a minimal rendering setup; additionally inspect the actual project's Linear URP output for shader and colour-space issues.
 
 Before committing, playtest soft/hard/off-centre shots into both nets; walk into each goal; watch crowd and arm motion at run/sprint speed; pause during a goal and restart the match. Assess image quality in a Game view at 1x or a fixed 1920x1080 resolution rather than enlarging a low-resolution preview. Device frame rate, touchscreen behavior and the subjective animation/shot feel still need hands-on testing.
 

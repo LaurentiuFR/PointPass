@@ -25,6 +25,8 @@ namespace PointPass.Gameplay
         private float sign;
         public const int NetSortingOrder = 12;
         public float ImpactStrength { get; private set; }
+        public float Side => sign;
+        public event System.Action<Vector2, float> Impacted;
 
         public static GoalNet Create(Transform parent, float side)
         {
@@ -122,6 +124,7 @@ namespace PointPass.Gameplay
         public void Impact(Vector2 localPoint, float speed)
         {
             if (speed < 0.15f) return;
+            Impacted?.Invoke(localPoint, speed);
             Vector2 direction = Mathf.Abs(localPoint.y) > MatchConfig.GoalWidth * 0.5f - 0.1f
                 ? Vector2.up * Mathf.Sign(localPoint.y) : Vector2.right * sign;
             ImpactStrength = Mathf.Clamp(speed * 0.024f, 0f, 0.38f);
