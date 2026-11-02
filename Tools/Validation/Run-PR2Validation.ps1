@@ -10,7 +10,7 @@ $validationRoot = Join-Path $repositoryRoot 'Logs/PR2Validation'
 $reportRoot = Join-Path $repositoryRoot 'Logs/PR2Verification'
 New-Item -ItemType Directory -Force -Path "$validationRoot/Assets/Scripts", "$validationRoot/Assets/Editor", "$validationRoot/Packages", "$validationRoot/ProjectSettings", $reportRoot | Out-Null
 New-Item -ItemType Directory -Force -Path "$validationRoot/Assets/Resources/Art" | Out-Null
-Copy-Item "$repositoryRoot/Assets/_Project/Resources/Art/NaturalTurf.shader" "$validationRoot/Assets/Resources/Art/NaturalTurf.shader"
+Get-ChildItem "$repositoryRoot/Assets/_Project/Resources/Art" -Filter '*.shader' | Copy-Item -Destination "$validationRoot/Assets/Resources/Art"
 
 # Copy source only. Unity generates metadata inside the disposable project.
 # Excluding the bootstrap prevents the normal match from starting in this test project.
@@ -28,6 +28,7 @@ Copy-Item "$PSScriptRoot/FlickValidation.cs" "$validationRoot/Assets/Editor/Flic
 Copy-Item "$PSScriptRoot/StadiumValidation.cs" "$validationRoot/Assets/Editor/StadiumValidation.cs"
 Copy-Item "$PSScriptRoot/GoalPresentationValidation.cs" "$validationRoot/Assets/Editor/GoalPresentationValidation.cs"
 Copy-Item "$PSScriptRoot/MatchDayValidation.cs" "$validationRoot/Assets/Editor/MatchDayValidation.cs"
+Copy-Item "$PSScriptRoot/GoalMomentValidation.cs" "$validationRoot/Assets/Editor/GoalMomentValidation.cs"
 Copy-Item "$repositoryRoot/ProjectSettings/ProjectVersion.txt" "$validationRoot/ProjectSettings/ProjectVersion.txt"
 
 # Reuse locally resolved packages; no package downloads or main-project settings changes.
@@ -35,6 +36,7 @@ $dependencies = @{
     'com.unity.modules.physics2d' = '1.0.0'
     'com.unity.modules.ui' = '1.0.0'
     'com.unity.modules.imgui' = '1.0.0'
+    'com.unity.modules.jsonserialize' = '1.0.0'
 }
 foreach ($packageName in @('com.unity.inputsystem', 'com.unity.ugui')) {
     $package = @(Get-ChildItem "$repositoryRoot/Library/PackageCache" -Directory -Filter "$packageName@*")

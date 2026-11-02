@@ -122,6 +122,7 @@ namespace PointPass.Players
             if (!possession.TryAcquire(controller)) return; // somebody else already has it
 
             carrying = true;
+            ball.RecordTouch(controller);
             ball.SetCurve(0f);
             Physics2D.IgnoreCollision(ownCollider, ball.Collider, true);
             movement.SpeedMultiplier = speedWhileDribbling;

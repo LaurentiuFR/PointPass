@@ -40,13 +40,16 @@ namespace PointPass.Gameplay
             Transform confetti = new GameObject("GoalConfetti").transform;
             confetti.SetParent(root.transform, false);
             confetti.gameObject.AddComponent<GoalConfetti>().Build(builder.material);
+            Transform photographers=new GameObject("StadiumPhotographers").transform;
+            photographers.SetParent(root.transform,false);
+            photographers.gameObject.AddComponent<StadiumPhotographers>().Build(builder.material);
         }
 
         private void BuildSurrounds()
         {
-            Color concourse = new Color(0.075f, 0.095f, 0.1f);
+            Color concourse = MatchPalette.Ink;
             Color runoff = new Color(0.105f, 0.22f, 0.17f);
-            Color deck = new Color(0.07f, 0.11f, 0.14f);
+            Color deck = MatchPalette.Surface;
             Color aisle = new Color(0.2f, 0.24f, 0.25f);
             Quad(Vector2.zero, new Vector2(28, 18), concourse);
             Quad(Vector2.zero, new Vector2(23.1f, 13.05f), runoff);
@@ -116,7 +119,8 @@ namespace PointPass.Gameplay
         {
             float fw = MatchConfig.FieldHalfWidth;
             float fh = MatchConfig.FieldHalfHeight;
-            Color paint = new Color(0.93f, 0.96f, 0.89f, 0.92f);
+            Color paint = MatchPalette.Paper;
+            paint.a = 0.92f;
             const float width = 0.038f;
             RectangleOutline(Vector2.zero, new Vector2(fw * 2, fh * 2), width, paint);
             Line(new Vector2(0, -fh), new Vector2(0, fh), width, paint);

@@ -52,7 +52,11 @@ namespace PointPass.Validation
                 confetti.Celebrate(Team.Red); bool second=confetti.IsActive;
                 confetti.Celebrate(Team.Blue); bool third=confetti.IsActive;
                 confetti.Celebrate(Team.Red);
-                check(!second && !third && confetti.IsActive,"Confetti appears occasionally rather than on every goal");
+                check(second && third && confetti.IsActive,"Each goal emits a short, bounded supporter confetti burst");
+                confetti.Advance(0.4f);
+                bool redSection=true;
+                foreach (Vector3 vertex in confetti.GetComponent<MeshFilter>().sharedMesh.vertices) redSection &= vertex.x>0;
+                check(redSection,"Red goal confetti stays in red supporters' sections");
                 confetti.ResetMatch();
                 check(!confetti.IsActive && confetti.GoalCount==0,"New match clears confetti and resets its goal cadence");
 

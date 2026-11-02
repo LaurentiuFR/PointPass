@@ -1,5 +1,6 @@
 using UnityEngine;
 using PointPass.Gameplay;
+using PointPass.Core;
 
 namespace PointPass.Players
 {
@@ -50,7 +51,8 @@ namespace PointPass.Players
             if (selectionRing.enabled)
             {
                 bool carrying = controller.Dribbler != null && controller.Dribbler.HasBall;
-                Color ringColor = new Color(0.52f, 0.94f, 0.76f, carrying ? 0.48f : 0.22f);
+                Color ringColor = MatchPalette.Accent;
+                ringColor.a = carrying ? 0.48f : 0.22f;
                 selectionRing.startColor = selectionRing.endColor = ringColor;
                 for (int i = 0; i < selectionRing.positionCount; i++)
                 {
@@ -92,8 +94,8 @@ namespace PointPass.Players
             line.SetPosition(18, tip);
             line.SetPosition(19, tip - endDirection * 0.25f - side * 0.17f);
             line.SetPosition(20, tip);
-            Color color = !shooting
-                ? new Color(0.52f, 0.94f, 0.76f, 0.75f) : new Color(1f, 0.8f, 0.43f, 0.75f);
+            Color color = shooting ? MatchPalette.Gold : MatchPalette.Accent;
+            color.a = 0.75f;
             line.startColor = line.endColor = color;
         }
 

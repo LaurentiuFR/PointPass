@@ -27,13 +27,13 @@ namespace PointPass.Core
         // Match rules
         public const float HalfSeconds = 90f;
         public const float OvertimeSeconds = 60f;
-        public const float GoalPauseSeconds = 2f;
+        public const float GoalPauseSeconds = 3.2f;
         public const float KickoffPauseSeconds = 1.2f;
         public const float HalfTimePauseSeconds = 2.5f;
 
         // Look
         public static readonly Color Background = new Color(0.09f, 0.27f, 0.13f);
-        public static readonly Color BlueTeam = new Color(0.18f, 0.44f, 0.93f);
-        public static readonly Color RedTeam = new Color(0.88f, 0.19f, 0.19f);
+        public static readonly Color BlueTeam = MatchPalette.Blue;
+        public static readonly Color RedTeam = MatchPalette.Red;
     }
 }

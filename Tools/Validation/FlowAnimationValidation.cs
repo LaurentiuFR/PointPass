@@ -137,7 +137,7 @@ namespace PointPass.Validation
                     && Mathf.DeltaAngle(0,rightElbow.localEulerAngles.z)<0,
                     "Running elbows tuck both hands inward toward the torso");
                 check(Mathf.Abs(leftTravel)>Mathf.Abs(leftArm.localPosition.x-leftRest.x)*3
-                    && Quaternion.Angle(leftArm.localRotation,Quaternion.identity)<12,
+                    && Mathf.Abs(Mathf.DeltaAngle(0,leftArm.localEulerAngles.z))<12,
                     "Running arm swing travels mainly forward/back instead of flaring sideways");
                 go.transform.rotation=Quaternion.Euler(0,0,-90);
                 Vector3 swingWorld=go.transform.TransformVector(leftArm.localPosition-leftRest);

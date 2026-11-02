@@ -13,6 +13,20 @@ namespace PointPass.Core
         private static Sprite whiteSquare;
         private static Sprite whiteCircle;
         private static Sprite softDisc;
+        private static Material blueKit;
+        private static Material redKit;
+
+        public static Material KitMaterial(Team team)
+        {
+            Material cached = team == Team.Blue ? blueKit : redKit;
+            if (cached != null) return cached;
+            Shader shader = Resources.Load<Shader>("Art/ClubKit");
+            if (shader == null) return null;
+            cached = new Material(shader) { name = team + " club palette" };
+            cached.SetColor("_ClubColor",MatchPalette.TeamColor(team));
+            if (team == Team.Blue) blueKit = cached; else redKit = cached;
+            return cached;
+        }
 
         public static Sprite Get(string spriteName, bool circleFallback = false)
         {
@@ -83,6 +97,11 @@ namespace PointPass.Core
             renderer.sprite = sprite;
             renderer.sortingOrder = sortingOrder;
             renderer.color = IsPlaceholder(sprite) ? placeholderColor : Color.white;
+            if (spriteName.StartsWith("player_"))
+            {
+                Material kit = KitMaterial(spriteName.Contains("_red") ? Team.Red : Team.Blue);
+                if (kit != null) renderer.sharedMaterial = kit;
+            }
 
             Vector2 native = sprite.bounds.size;
             go.transform.localScale = new Vector3(worldSize.x / native.x, worldSize.y / native.y, 1f);
@@ -112,7 +131,7 @@ namespace PointPass.Core
         public static Sprite WhiteCircle()
         {
             if (whiteCircle != null) return whiteCircle;
-            const int size = 128;
+            const int size = 512;
             Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
             tex.filterMode = FilterMode.Bilinear;
             float radius = size * 0.5f;

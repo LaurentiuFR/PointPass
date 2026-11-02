@@ -33,6 +33,10 @@ namespace PointPass.Gameplay
         private StadiumCrowd crowd;
         private GoalConfetti confetti;
         private SidelineReferee referee;
+        private StadiumPhotographers photographers;
+        private GoalReplayRecorder replay;
+        private Team lastScoringTeam;
+        private bool wasOwnGoal;
 
         public bool IsUserPaused => userPaused;
         public bool IsInMainMenu => phase == Phase.MainMenu;
@@ -47,6 +51,11 @@ namespace PointPass.Gameplay
             crowd = GetComponentInChildren<StadiumCrowd>();
             confetti = GetComponentInChildren<GoalConfetti>();
             referee = GetComponentInChildren<SidelineReferee>();
+            photographers = GetComponentInChildren<StadiumPhotographers>();
+            replay = GetComponent<GoalReplayRecorder>();
+            if (replay == null) replay = gameObject.AddComponent<GoalReplayRecorder>();
+            replay.Init(ball,players);
+            replay.ClipReady += OnReplayReady;
             hud.PauseRequested += PauseMatch;
         }
 
@@ -59,6 +68,7 @@ namespace PointPass.Gameplay
             menu.ResumeRequested += ResumeMatch;
             menu.RestartRequested += StartMatch;
             menu.MainMenuRequested += OpenMainMenu;
+            menu.SetReplay(replay?.Latest);
         }
 
         private void UnsubscribeMenu()
@@ -106,6 +116,12 @@ namespace PointPass.Gameplay
             crowd?.Celebrate(scoringTeam);
             confetti?.Celebrate(scoringTeam);
             referee?.SignalGoal(scoringTeam);
+            photographers?.Celebrate();
+            PlayerController scorer=ball.LastTouch;
+            lastScoringTeam=scoringTeam;
+            wasOwnGoal=scorer!=null && scorer.Team!=scoringTeam;
+            if (scorer!=null && scorer.Team==scoringTeam) scorer.GetComponent<PlayerAnimator>()?.CelebrateGoal();
+            replay?.BeginGoal(scoringTeam);
             StartCoroutine(GoalRoutine());
         }
 
@@ -120,6 +136,7 @@ namespace PointPass.Gameplay
                 return;
             }
             if (userPaused) return;
+            replay?.SetRecording(phase == Phase.Playing);
             if (phase == Phase.Playing)
             {
                 clock -= Time.deltaTime;
@@ -211,7 +228,7 @@ namespace PointPass.Gameplay
             foreach (PlayerController player in players)
                 if (player != null) player.SetActive(false);
             ball.SetCurve(0f);
-            hud.ShowMessage("GOAL!");
+            hud.ShowGoalMessage(lastScoringTeam,wasOwnGoal);
             yield return new WaitForSeconds(MatchConfig.GoalPauseSeconds);
 
             if (overtime)
@@ -273,6 +290,9 @@ namespace PointPass.Gameplay
         // Every player returns to his kick-off spot and the ball becomes free.
         private void ResetPositions()
         {
+            replay?.ResetHistory();
+            photographers?.ResetFlashes();
+            hud?.ClearGoalReplayCue();
             crowd?.ResetCelebration();
             confetti?.Clear();
             referee?.ResetSignal();
@@ -282,6 +302,7 @@ namespace PointPass.Gameplay
             foreach (PlayerController player in players)
             {
                 if (player == null) continue;
+                player.GetComponent<PlayerAnimator>()?.ClearCelebration();
                 player.ResetToKickoff();
             }
         }
@@ -322,9 +343,16 @@ namespace PointPass.Gameplay
 
         private void OnDestroy()
         {
+            if (replay != null) replay.ClipReady -= OnReplayReady;
             RestoreGameTime();
             UnsubscribeMenu();
             if (hud != null) hud.PauseRequested -= PauseMatch;
+        }
+
+        private void OnReplayReady(GoalReplayClip clip)
+        {
+            menu?.SetReplay(clip);
+            hud?.ShowGoalReplayCue(replay.SavedToDisk);
         }
     }
 }

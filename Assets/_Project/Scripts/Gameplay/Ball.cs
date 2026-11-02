@@ -1,4 +1,5 @@
 using UnityEngine;
+using PointPass.Players;
 
 namespace PointPass.Gameplay
 {
@@ -21,6 +22,8 @@ namespace PointPass.Gameplay
 
         public Rigidbody2D Body { get; private set; }
         public Collider2D Collider { get; private set; }
+        public PlayerController LastTouch { get; private set; }
+        public void RecordTouch(PlayerController player) => LastTouch = player;
         public float Curve => curveRemaining > 0f ? curveStrength * curveRemaining / Mathf.Max(0.01f, curveDuration) : 0f;
 
         /// <summary>Predicted heading change in degrees for a new shot, before collisions or drag.</summary>
@@ -109,12 +112,15 @@ namespace PointPass.Gameplay
         {
             SetCurve(0f);
             if (collision == null || collision.collider == null) return;
+            PlayerController touchedPlayer=collision.collider.GetComponentInParent<PlayerController>();
+            if (touchedPlayer!=null) RecordTouch(touchedPlayer);
             GoalNet net = collision.collider.GetComponentInParent<GoalNet>();
             if (net != null) net.Absorb(this, collision);
         }
 
         public void ResetTo(Vector2 position)
         {
+            LastTouch = null;
             if (settlingInNet) Body.linearDamping = fieldDamping;
             settlingInNet = false;
             SetCurve(0f);

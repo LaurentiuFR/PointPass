@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using PointPass.Core;
+using PointPass.Gameplay;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
@@ -11,13 +12,13 @@ namespace PointPass.UI
     /// <summary>Modal presentation for the offline prototype. MatchManager owns match state.</summary>
     public class MatchMenu : MonoBehaviour, ICancelHandler
     {
-        public enum Screen { Main, Pause, Results, Controls }
+        public enum Screen { Main, Pause, Results, Controls, Replay }
 
-        private static readonly Color Ink = new Color(0.025f, 0.05f, 0.07f, 1f);
-        private static readonly Color Surface = new Color(0.055f, 0.095f, 0.12f, 1f);
-        private static readonly Color Paper = new Color(0.94f, 0.97f, 0.98f, 1f);
-        private static readonly Color Muted = new Color(0.59f, 0.7f, 0.75f, 1f);
-        private static readonly Color Mint = new Color(0.52f, 0.94f, 0.76f, 1f);
+        private static readonly Color Ink = MatchPalette.Ink;
+        private static readonly Color Surface = MatchPalette.Surface;
+        private static readonly Color Paper = MatchPalette.Paper;
+        private static readonly Color Muted = MatchPalette.Muted;
+        private static readonly Color Mint = MatchPalette.Accent;
         private static Sprite roundedSprite;
         private static Sprite ringSprite;
 
@@ -32,6 +33,15 @@ namespace PointPass.UI
         private Vector2Int lastSize;
         private Screen controlsOrigin;
         private int lastActivationFrame = -1;
+        private RectTransform heroMotion;
+        private RectTransform menuBall;
+        private CanvasGroup mainEntrance;
+        private float menuAge;
+        private GoalReplayClip latestReplay;
+        private GoalReplayView replayView;
+        private Screen replayOrigin;
+        private Button pauseReplay;
+        private Button resultsReplay;
 
         public event Action PlayRequested;
         public event Action ResumeRequested;
@@ -65,6 +75,7 @@ namespace PointPass.UI
             menu.BuildPause();
             menu.BuildResults();
             menu.BuildControls();
+            menu.BuildReplay();
             menu.ApplyLayout();
             menu.Hide();
             return menu;
@@ -74,6 +85,18 @@ namespace PointPass.UI
         {
             if (UnityEngine.Screen.safeArea != lastSafeArea || UnityEngine.Screen.width != lastSize.x
                 || UnityEngine.Screen.height != lastSize.y) ApplyLayout();
+            AdvanceMotion(Time.unscaledDeltaTime);
+        }
+
+        public void AdvanceMotion(float seconds)
+        {
+            if (CurrentScreen != Screen.Main || heroMotion == null) return;
+            menuAge += seconds;
+            mainEntrance.alpha = Mathf.SmoothStep(0,1,menuAge / 0.45f);
+            heroMotion.anchoredPosition = new Vector2(-27, 39 + Mathf.Sin(menuAge * 1.3f) * 7f);
+            heroMotion.localRotation = Quaternion.Euler(0,0,-28 + Mathf.Sin(menuAge * 0.7f) * 2f);
+            menuBall.anchoredPosition = new Vector2(126 + Mathf.Sin(menuAge * 0.9f) * 10f, 142 + Mathf.Cos(menuAge * 0.9f) * 6f);
+            menuBall.localRotation = Quaternion.Euler(0,0,-menuAge * 9f);
         }
 
         private void OnEnable()
@@ -103,7 +126,7 @@ namespace PointPass.UI
         public void ShowResults(int blue, int red)
         {
             resultTitle.text = blue == red ? "HONOURS EVEN" : blue > red ? "BLUE WINS" : "RED WINS";
-            resultScore.text = $"<color=#7CAEFF>{blue}</color> <color=#627780>:</color> <color=#FF8E92>{red}</color>";
+            resultScore.text = $"<color=#4085DB>{blue}</color> <color=#627780>:</color> <color=#E0594A>{red}</color>";
             Show(Screen.Results);
         }
 
@@ -115,6 +138,7 @@ namespace PointPass.UI
 
         private void Show(Screen screen)
         {
+            if (screen == Screen.Main) { menuAge = 0; if (mainEntrance != null) mainEntrance.alpha = 0; }
             CurrentScreen = screen;
             gameObject.SetActive(true);
             foreach (KeyValuePair<Screen, GameObject> entry in screens) entry.Value.SetActive(entry.Key == screen);
@@ -139,6 +163,7 @@ namespace PointPass.UI
         {
             if (!IsOpen) return false;
             if (CurrentScreen == Screen.Controls) { Show(controlsOrigin); return true; }
+            if (CurrentScreen == Screen.Replay) { Show(replayOrigin); return true; }
             if (CurrentScreen == Screen.Pause) { ResumeRequested?.Invoke(); return true; }
             return false;
         }
@@ -167,29 +192,36 @@ namespace PointPass.UI
         private void BuildMain()
         {
             RectTransform page = Page(Screen.Main);
-            Label(page, "Eyebrow", "F O O T B A L L .   T O G E T H E R .", 20, new Vector2(-342, 330), new Vector2(580, 40), Mint, false, TextAnchor.MiddleLeft);
-            Label(page, "Wordmark", "POINT<color=#85EFC2>PASS</color>", 84, new Vector2(-342, 235), new Vector2(600, 110), Paper, true, TextAnchor.MiddleLeft);
+            mainEntrance = page.gameObject.AddComponent<CanvasGroup>();
+            Image matchday = Panel(page,"MatchdayBadge",Surface,new Vector2(-512,335),new Vector2(240,40));
+            Label(matchday.transform,"BadgeText","MATCHDAY  /  POINT PASS",15,Vector2.zero,new Vector2(230,36),Mint,true);
+            Text wordmark = Label(page, "Wordmark", "POINT<color=#CFE697>PASS</color>", 89, new Vector2(-342, 235), new Vector2(600, 110), Paper, true, TextAnchor.MiddleLeft);
+            wordmark.fontStyle = FontStyle.BoldAndItalic;
+            Bar(page,"WordmarkUnderline",new Vector2(-583,177),new Vector2(96,5),MatchPalette.Gold);
             Label(page, "Headline", "MAKE EVERY\nPASS COUNT.", 43, new Vector2(-342, 100), new Vector2(580, 125), Paper, true, TextAnchor.MiddleLeft);
-            Label(page, "Description", "Find your touch. Hold to charge.\nMove into space and finish the chance.", 26,
+            Label(page, "Description", "Play the space. Find your teammate.\nTurn one good pass into a great goal.", 25,
                 new Vector2(-342, -20), new Vector2(580, 90), Muted, false, TextAnchor.MiddleLeft);
-            Button play = ActionButton(page, "PlayOffline", "PLAY OFFLINE    >", new Vector2(-372, -151), new Vector2(520, 88), true,
+            Button play = ActionButton(page, "PlayOffline", "STEP ONTO THE PITCH    >", new Vector2(-372, -151), new Vector2(520, 88), true,
                 () => PlayRequested?.Invoke());
             ActionButton(page, "HowToPlay", "HOW TO PLAY", new Vector2(-372, -257), new Vector2(520, 78), false,
                 () => ShowControls(Screen.Main));
             firstButtons.Add(Screen.Main, play);
             Label(page, "Mode", "OFFLINE PROTOTYPE  /  SINGLE PLAYER", 18, new Vector2(-342, -343), new Vector2(580, 32), Muted, false, TextAnchor.MiddleLeft);
 
-            Image card = Panel(page, "HeroCard", new Color(0.055f, 0.11f, 0.13f), new Vector2(357, 30), new Vector2(550, 680));
+            Image card = Panel(page, "HeroCard", Surface, new Vector2(357, 30), new Vector2(550, 680));
+            RectTransform graphic = Rect(card.transform,"TacticalPitch");
+            Place(graphic,Vector2.zero,new Vector2(500,615));
+            graphic.gameObject.AddComponent<FootballGraphic>().raycastTarget = false;
             Label(card.transform, "HeroEyebrow", "THE PITCH IS YOURS", 20, new Vector2(0, 281), new Vector2(470, 40), Mint);
-            PictureAt(card.transform, "PitchCircle", Ring(), new Color(0.45f, 0.88f, 0.69f, 0.15f), new Vector2(0, 30), new Vector2(390, 390));
-            Bar(card.transform, "HalfwayLine", new Vector2(0, 27), new Vector2(460, 2), new Color(0.45f, 0.88f, 0.69f, 0.12f));
             RectTransform hero = Rect(card.transform, "Hero");
+            heroMotion = hero;
             Place(hero, new Vector2(-27, 39), new Vector2(330, 330));
             hero.localRotation = Quaternion.Euler(0, 0, -28);
             PictureAt(hero, "LeftBoot", SpriteLibrary.Get("boot_polished"), Color.white, new Vector2(-38, 108), new Vector2(96, 114));
             PictureAt(hero, "RightBoot", SpriteLibrary.Get("boot_polished"), Color.white, new Vector2(38, 108), new Vector2(96, 114));
             PictureAt(hero, "Player", SpriteLibrary.Get("player_blue_polished"), Color.white, Vector2.zero, new Vector2(330, 330));
-            PictureAt(card.transform, "Football", SpriteLibrary.Get("ball_polished"), Color.white, new Vector2(133, 151), new Vector2(125, 125));
+            menuBall = PictureAt(card.transform, "Football", SpriteLibrary.Get("ball_polished"), Color.white, new Vector2(133, 151), new Vector2(125, 125)).rectTransform;
+            Panel(card.transform,"HeroCaption",Surface,new Vector2(0,-237),new Vector2(500,147));
             Bar(card.transform, "Accent", new Vector2(0, -190), new Vector2(40, 3), Mint);
             Label(card.transform, "Rules", "TWO HALVES.\nONE GOLDEN CHANCE.", 30, new Vector2(0, -245), new Vector2(460, 90), Paper, true);
             Label(page, "Footer", "MOVEMENT  /  PASSING  /  SHOOTING", 17, new Vector2(357, -363), new Vector2(550, 32), Muted);
@@ -211,6 +243,8 @@ namespace PointPass.UI
             ActionButton(card.transform, "MainMenu", "MAIN MENU", new Vector2(0, -247), new Vector2(520, 76), false,
                 () => MainMenuRequested?.Invoke());
             firstButtons.Add(Screen.Pause, resume);
+            pauseReplay=ActionButton(card.transform,"ReplayLastGoal","WATCH LAST GOAL",new Vector2(0,-328),new Vector2(520,54),false,()=>ShowReplay(Screen.Pause));
+            pauseReplay.gameObject.SetActive(false);
         }
 
         private void BuildResults()
@@ -227,6 +261,29 @@ namespace PointPass.UI
             ActionButton(card.transform, "MainMenu", "MAIN MENU", new Vector2(0, -247), new Vector2(550, 76), false,
                 () => MainMenuRequested?.Invoke());
             firstButtons.Add(Screen.Results, again);
+            resultsReplay=ActionButton(card.transform,"ReplayLastGoal","WATCH LAST GOAL",new Vector2(0,-62),new Vector2(400,48),false,()=>ShowReplay(Screen.Results));
+            resultsReplay.gameObject.SetActive(false);
+        }
+
+        public void SetReplay(GoalReplayClip clip)
+        {
+            latestReplay=clip;
+            pauseReplay.gameObject.SetActive(clip!=null); resultsReplay.gameObject.SetActive(clip!=null);
+        }
+
+        private void ShowReplay(Screen origin)
+        {
+            if (latestReplay==null) return;
+            replayOrigin=origin; replayView.Play(latestReplay); Show(Screen.Replay);
+        }
+
+        private void BuildReplay()
+        {
+            RectTransform page=Page(Screen.Replay);
+            Panel(page,"ReplayCard",Surface,Vector2.zero,new Vector2(1270,800));
+            replayView=page.gameObject.AddComponent<GoalReplayView>(); replayView.Build();
+            Button back=ActionButton(page,"ReplayBack","BACK TO MATCH MENU",new Vector2(0,-347),new Vector2(450,62),false,()=>Show(replayOrigin));
+            firstButtons.Add(Screen.Replay,back);
         }
 
         private void BuildControls()
@@ -236,11 +293,11 @@ namespace PointPass.UI
             Label(page, "Eyebrow", "M A K E   Y O U R   M O V E", 19, new Vector2(0, 326), new Vector2(1120, 40), Mint);
             Label(page, "Title", "HOW TO PLAY", 49, new Vector2(0, 252), new Vector2(1120, 80), Paper, true);
             BuildControlColumn(page, "Keyboard", -405, "KEYBOARD",
-                "<color=#85EFC2>WASD / ARROWS</color>\nMove and aim\n\n<color=#85EFC2>J / K</color>\nHold pass / shoot, release to kick\n\n<color=#85EFC2>Q / E WHILE SHOOTING</color>\nBend left / right\n\n<color=#85EFC2>SHIFT / ESC / P</color>\nSprint / cancel / pause");
+                "<color=#CFE697>WASD / ARROWS</color>\nMove and aim\n\n<color=#CFE697>J / K</color>\nHold pass / shoot, release to kick\n\n<color=#CFE697>Q / E WHILE SHOOTING</color>\nBend left / right\n\n<color=#CFE697>SHIFT / ESC / P</color>\nSprint / cancel / pause");
             BuildControlColumn(page, "Touch", 0, "TOUCH",
-                "<color=#85EFC2>LEFT JOYSTICK</color>\nMove and aim\n\n<color=#85EFC2>PASS / SHOOT</color>\nHold to charge, release to kick\n\n<color=#85EFC2>FLICK FROM SHOOT</color>\nFlick sideways as you release\nto bend toward that side\n\n<color=#85EFC2>SPRINT / PAUSE</color>\nRun faster / take a break");
+                "<color=#CFE697>LEFT JOYSTICK</color>\nMove and aim\n\n<color=#CFE697>PASS / SHOOT</color>\nHold to charge, release to kick\n\n<color=#CFE697>FLICK FROM SHOOT</color>\nFlick sideways as you release\nto bend toward that side\n\n<color=#CFE697>SPRINT / PAUSE</color>\nRun faster / take a break");
             BuildControlColumn(page, "Gamepad", 405, "GAMEPAD",
-                "<color=#85EFC2>LEFT STICK</color>\nMove and aim\n\n<color=#85EFC2>SOUTH / EAST</color>\nHold pass / shoot, release to kick\n\n<color=#85EFC2>RIGHT STICK</color>\nBend a shot toward that side\n\n<color=#85EFC2>RB / NORTH / START</color>\nSprint / cancel / pause");
+                "<color=#CFE697>LEFT STICK</color>\nMove and aim\n\n<color=#CFE697>SOUTH / EAST</color>\nHold pass / shoot, release to kick\n\n<color=#CFE697>RIGHT STICK</color>\nBend a shot toward that side\n\n<color=#CFE697>RB / NORTH / START</color>\nSprint / cancel / pause");
             Button back = ActionButton(page, "Back", "BACK", new Vector2(0, -319), new Vector2(400, 72), false,
                 () => Show(controlsOrigin));
             firstButtons.Add(Screen.Controls, back);
@@ -254,7 +311,7 @@ namespace PointPass.UI
 
         private Button ActionButton(Transform parent, string name, string title, Vector2 position, Vector2 size, bool primary, Action action)
         {
-            Image image = Panel(parent, name, primary ? Mint : new Color(0.09f, 0.145f, 0.175f), position, size);
+            Image image = Panel(parent, name, primary ? Mint : Color.Lerp(Surface,Paper,0.045f), position, size);
             image.raycastTarget = true;
             Button button = image.gameObject.AddComponent<MenuButton>();
             button.targetGraphic = image;
@@ -311,6 +368,8 @@ namespace PointPass.UI
         {
             Image image = Rect(parent, name).gameObject.AddComponent<Image>();
             image.sprite = sprite; image.color = color; image.raycastTarget = false;
+            if (sprite != null && sprite.texture.name.StartsWith("player_"))
+                image.material = SpriteLibrary.KitMaterial(sprite.texture.name.Contains("_red") ? Team.Red : Team.Blue);
             return image;
         }
 
@@ -334,7 +393,7 @@ namespace PointPass.UI
         private static Text Label(Transform parent, string name, string value, int size, Vector2 position, Vector2 bounds,
             Color color, bool bold = false, TextAnchor alignment = TextAnchor.MiddleCenter)
         {
-            Text text = Rect(parent, name).gameObject.AddComponent<Text>();
+            Text text = Rect(parent, name).gameObject.AddComponent<SharpText>();
             text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             text.fontSize = size; text.fontStyle = bold ? FontStyle.Bold : FontStyle.Normal;
             text.alignment = alignment; text.color = color; text.text = value;
@@ -348,7 +407,7 @@ namespace PointPass.UI
         private static Sprite Rounded()
         {
             if (roundedSprite != null) return roundedSprite;
-            const int size = 64;
+            const int size = 128;
             Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
             texture.name = "Menu Rounded Panel";
             texture.wrapMode = TextureWrapMode.Clamp;
@@ -356,29 +415,29 @@ namespace PointPass.UI
             for (int y = 0; y < size; y++)
                 for (int x = 0; x < size; x++)
                 {
-                    Vector2 edge = new Vector2(Mathf.Abs(x + 0.5f - 32), Mathf.Abs(y + 0.5f - 32)) - Vector2.one * 15;
+                    Vector2 edge = new Vector2(Mathf.Abs(x + 0.5f - 64), Mathf.Abs(y + 0.5f - 64)) - Vector2.one * 30;
                     float distance = new Vector2(Mathf.Max(edge.x, 0), Mathf.Max(edge.y, 0)).magnitude
-                        + Mathf.Min(Mathf.Max(edge.x, edge.y), 0) - 16;
+                        + Mathf.Min(Mathf.Max(edge.x, edge.y), 0) - 32;
                     pixels[y * size + x] = new Color(1, 1, 1, Mathf.Clamp01(0.5f - distance));
                 }
             texture.SetPixels(pixels); texture.Apply();
             roundedSprite = Sprite.Create(texture, new UnityEngine.Rect(0, 0, size, size), Vector2.one * 0.5f,
-                100, 0, SpriteMeshType.FullRect, Vector4.one * 18);
+                200, 0, SpriteMeshType.FullRect, Vector4.one * 36);
             return roundedSprite;
         }
 
         private static Sprite Ring()
         {
             if (ringSprite != null) return ringSprite;
-            const int size = 128;
+            const int size = 512;
             Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
             texture.name = "Menu Pitch Ring";
             Color[] pixels = new Color[size * size];
             for (int y = 0; y < size; y++)
                 for (int x = 0; x < size; x++)
                 {
-                    float radius = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), Vector2.one * 64);
-                    pixels[y * size + x] = new Color(1, 1, 1, Mathf.Clamp01(63 - radius) * Mathf.Clamp01(radius - 60));
+                    float radius = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), Vector2.one * 256);
+                    pixels[y * size + x] = new Color(1, 1, 1, Mathf.Clamp01(255 - radius) * Mathf.Clamp01(radius - 247));
                 }
             texture.SetPixels(pixels); texture.Apply();
             ringSprite = Sprite.Create(texture, new UnityEngine.Rect(0, 0, size, size), Vector2.one * 0.5f, 100);

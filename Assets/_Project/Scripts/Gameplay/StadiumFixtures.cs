@@ -7,6 +7,8 @@ namespace PointPass.Gameplay
     {
         public const int TowerCount = 4;
         public const int BroadcastCameraCount = 6;
+        private MeshRenderer atmosphericBeams;
+        public float Haze { get; private set; }
 
         public static Vector2 LightPosition(int index) => new Vector2(index % 2 == 0 ? -10.55f : 10.55f,
             index < 2 ? 6.38f : -6.38f);
@@ -17,6 +19,7 @@ namespace PointPass.Gameplay
             PresentationMesh illumination = new PresentationMesh();
             PresentationMesh glows = new PresentationMesh();
             PresentationMesh cameras = new PresentationMesh();
+            PresentationMesh beams = new PresentationMesh();
             for (int i = 0; i < TowerCount; i++)
             {
                 Vector2 position = LightPosition(i);
@@ -24,8 +27,12 @@ namespace PointPass.Gameplay
                 marker.transform.SetParent(transform, false); marker.transform.localPosition = position;
                 towers.Origin = position; glows.Origin = position;
                 Tower(towers, glows);
+                Vector2 lamp=position+Vector2.up*0.68f;
+                Vector2 target=new Vector2(Mathf.Sign(position.x)*6,Mathf.Sign(position.y)*3);
+                Vector2 width=Vector2.Perpendicular((target-lamp).normalized)*1.3f;
+                beams.GradientTriangle(lamp,target-width,target+width,new Color(0.91f,0.93f,0.84f,0.065f),new Color(0.91f,0.93f,0.84f,0));
                 illumination.Ellipse(new Vector2(Mathf.Sign(position.x)*5, Mathf.Sign(position.y)*2),
-                    new Vector2(5, 4), new Color(0.93f, 0.94f, 0.84f, 0.075f), true, 48);
+                    new Vector2(5, 4), new Color(0.93f, 0.94f, 0.84f, 0.025f), true, 48);
             }
             for (int i = 0; i < BroadcastCameraCount; i++)
             {
@@ -42,6 +49,14 @@ namespace PointPass.Gameplay
             cameras.Build(transform, "BroadcastRigs", material, 0);
             illumination.Build(transform, "PitchIllumination", material, -9);
             glows.Build(transform, "LampBloom", material, 3);
+            atmosphericBeams=beams.Build(transform,"AtmosphericBeams",material,-7);
+            SetHaze(0); // Clear weather: light on the turf, no theatrical beams in clean air.
+        }
+
+        public void SetHaze(float density)
+        {
+            Haze=Mathf.Clamp01(density);
+            if (atmosphericBeams!=null) atmosphericBeams.enabled=Haze>0.2f;
         }
 
         private static void Tower(PresentationMesh mesh, PresentationMesh glow)
@@ -67,7 +82,7 @@ namespace PointPass.Gameplay
                     mesh.Quad(center, new Vector2(0.104f,0.094f), new Color(0.95f,0.95f,0.82f));
                     mesh.Line(center+new Vector2(-0.035f,0.025f),center+new Vector2(0.035f,0.025f),0.015f,Color.white);
                 }
-            glow.Ellipse(new Vector2(0,0.68f), new Vector2(0.8f,0.43f), new Color(1,0.95f,0.75f,0.21f), true);
+            glow.Ellipse(new Vector2(0,0.68f), new Vector2(0.6f,0.3f), new Color(1,0.95f,0.75f,0.06f), true);
         }
 
         private static void BroadcastCamera(PresentationMesh mesh)

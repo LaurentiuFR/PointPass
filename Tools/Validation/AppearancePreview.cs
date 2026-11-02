@@ -157,6 +157,7 @@ namespace PointPass.Validation
                 Call(player.GetComponent<PlayerAimGuide>(), "LateUpdate");
                 MatchMenu menu = UnityEngine.Object.FindFirstObjectByType<MatchMenu>(FindObjectsInactive.Include);
                 menu.ShowMain();
+                menu.AdvanceMotion(0.6f);
                 Capture(camera, menu.GetComponent<Canvas>(), 1920, 1080, "../AppearanceVerification/menu-main.png");
                 Capture(camera, menu.GetComponent<Canvas>(), 1440, 1080, "../AppearanceVerification/menu-main-tablet.png");
                 Call(menu, "ShowControls", MatchMenu.Screen.Main);

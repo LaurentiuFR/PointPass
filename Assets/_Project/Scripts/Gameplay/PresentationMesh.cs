@@ -35,6 +35,13 @@ namespace PointPass.Gameplay
             { triangles.Add(start); triangles.Add(start + i); triangles.Add(start + i + 1); }
         }
 
+        public void GradientTriangle(Vector2 a,Vector2 b,Vector2 c,Color from,Color to)
+        {
+            int start=vertices.Count;
+            Vertex(a,from); Vertex(b,to); Vertex(c,to);
+            triangles.Add(start); triangles.Add(start+1); triangles.Add(start+2);
+        }
+
         public void Line(Vector2 from, Vector2 to, float width, Color color)
         {
             Vector2 normal = Vector2.Perpendicular((to - from).normalized) * width * 0.5f;

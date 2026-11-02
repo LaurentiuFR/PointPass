@@ -9,7 +9,7 @@ namespace PointPass.Gameplay
     {
         private struct Fan
         {
-            public int start, left, right, end;
+            public int start, head, left, right, end;
             public Vector2 position;
             public float phase, enthusiasm, delay;
             public Team team;
@@ -25,6 +25,7 @@ namespace PointPass.Gameplay
         private Team scoringTeam;
         public bool IsCelebrating => celebrationAge < 3.2f;
         public int SpectatorCount => fans.Count;
+        public static Team SupporterTeamAt(Vector2 position) => position.x < 0 ? Team.Blue : Team.Red;
 
         public void Build(Material material)
         {
@@ -62,8 +63,8 @@ namespace PointPass.Gameplay
             int id = index + row * 503;
             if (Hash(id, 1) < 0.2f) return;
             Vector2 position = seat + new Vector2((Hash(id, 2) - 0.5f) * 0.035f, 0);
-            Team team = Hash(id, 3) < 0.52f ? Team.Blue : Team.Red;
-            Color shirt = team == Team.Blue ? new Color(0.17f, 0.4f, 0.72f) : new Color(0.73f, 0.22f, 0.22f);
+            Team team = SupporterTeamAt(position);
+            Color shirt = MatchPalette.TeamColor(team);
             if (Hash(id, 4) < 0.32f) shirt = Color.Lerp(new Color(0.24f, 0.29f, 0.3f), new Color(0.85f, 0.83f, 0.72f), Hash(id, 5));
             shirt *= Mathf.Lerp(0.8f, 1.15f, Hash(id, 6)); shirt.a = 1;
             Color skin = Color.Lerp(new Color(0.31f, 0.18f, 0.12f), new Color(0.94f, 0.73f, 0.54f), Hash(id, 7));
@@ -74,6 +75,7 @@ namespace PointPass.Gameplay
             Line(position + new Vector2(-0.026f, -0.015f), position + new Vector2(-0.033f, -0.085f), 0.035f, trousers);
             Line(position + new Vector2(0.026f, -0.015f), position + new Vector2(0.033f, -0.085f), 0.035f, trousers);
             Ellipse(position, new Vector2(0.066f, 0.065f), shirt, 10);
+            fan.head = vertices.Count;
             Ellipse(position + new Vector2(0, 0.073f), new Vector2(0.038f, 0.044f), skin, 12);
             Ellipse(position + new Vector2(0, 0.098f), new Vector2(0.039f, 0.023f), hair, 10);
             fan.left = vertices.Count;
@@ -118,17 +120,21 @@ namespace PointPass.Gameplay
                 float age = celebrationAge - fan.delay;
                 float reaction = age > 0 ? Mathf.SmoothStep(0, 1, age / 0.18f)
                     * (1f - Mathf.SmoothStep(0, 1, Mathf.InverseLerp(2.2f, 3.2f, age))) : 0;
-                float cheer = reaction * (fan.team == scoringTeam ? 1f : 0.18f) * fan.enthusiasm;
-                float bounce = Mathf.Abs(Mathf.Sin(age * 9f + fan.phase)) * cheer * 0.065f;
+                bool winning = fan.team == scoringTeam;
+                float cheer = reaction * fan.enthusiasm;
+                float bounce = winning ? Mathf.Abs(Mathf.Sin(age * 9f + fan.phase)) * cheer * 0.065f : -cheer * 0.012f;
                 float idle = Mathf.Sin(elapsed * 1.8f + fan.phase) * 0.003f;
                 // Mix overhead waving with clapping, and stagger reactions across sections.
-                float armAngle = cheer * (fan.phase < 2.1f
+                float armAngle = cheer * (winning ? (fan.phase < 2.1f
                     ? 87f + 20f * Mathf.Sin(age * 18f + fan.phase)
-                    : 145f + 12f * Mathf.Sin(age * 13f + fan.phase)) * Mathf.Deg2Rad;
+                    : 145f + 12f * Mathf.Sin(age * 13f + fan.phase))
+                    : fan.phase < 2.1f ? -132f : fan.phase < 4.2f ? -8f : -38f) * Mathf.Deg2Rad;
                 float cosine = Mathf.Cos(armAngle), sine = Mathf.Sin(armAngle);
                 for (int i = fan.start; i < fan.end; i++)
                 {
                     Vector2 point = rest[i];
+                    if (!winning && i >= fan.head && i < fan.left)
+                        point += new Vector2(Mathf.Sin(age * 7f + fan.phase)*cheer*0.005f,-cheer*0.026f);
                     if (i >= fan.left)
                     {
                         float side = i < fan.right ? -1 : 1;

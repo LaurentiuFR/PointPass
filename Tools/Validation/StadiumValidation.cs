@@ -16,8 +16,8 @@ namespace PointPass.Validation
                 StadiumBuilder.Build(root.transform);
                 MeshFilter[] filters = root.GetComponentsInChildren<MeshFilter>();
                 MeshRenderer[] renderers = root.GetComponentsInChildren<MeshRenderer>();
-                check(filters.Length == 11 && renderers.Length == 11,
-                    "Detailed stadium, lights, cameras, crowd, referee and pooled confetti use eleven mesh renderers");
+                check(filters.Length == 13 && renderers.Length == 13,
+                    "Stadium lighting, photographers and match-day presentation stay within thirteen batched meshes");
                 check(root.GetComponentsInChildren<Collider2D>().Length == 0,
                     "Stadium presentation adds no physical obstacles");
                 check(renderers[0].sharedMaterial == renderers[1].sharedMaterial,

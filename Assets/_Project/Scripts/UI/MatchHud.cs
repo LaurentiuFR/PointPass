@@ -11,11 +11,11 @@ namespace PointPass.UI
     /// <summary>Runtime match presentation. Gameplay and input remain in their own components.</summary>
     public class MatchHud : MonoBehaviour
     {
-        private static readonly Color Ink = new Color(0.035f, 0.065f, 0.09f, 0.98f);
-        private static readonly Color Paper = new Color(0.94f, 0.97f, 0.98f);
-        private static readonly Color Muted = new Color(0.62f, 0.72f, 0.77f);
-        private static readonly Color Mint = new Color(0.52f, 0.94f, 0.76f);
-        private static readonly Color Gold = new Color(1f, 0.8f, 0.43f);
+        private static readonly Color Ink = MatchPalette.Ink;
+        private static readonly Color Paper = MatchPalette.Paper;
+        private static readonly Color Muted = MatchPalette.Muted;
+        private static readonly Color Mint = MatchPalette.Accent;
+        private static readonly Color Gold = MatchPalette.Gold;
         private static Sprite ringSprite;
         private static Sprite roundedSprite;
 
@@ -51,6 +51,9 @@ namespace PointPass.UI
         private bool playerActive;
         private bool playerHasBall;
         private bool playerUsingGamepad;
+        private Image replayCue;
+        private int displayedSeconds = -1;
+        private string displayedPhase;
 
         public VirtualJoystick Joystick { get; private set; }
         public HoldActionButton PassButton { get; private set; }
@@ -59,7 +62,7 @@ namespace PointPass.UI
         public event Action PauseRequested;
 
         public static string ScoreLine(int blue, int red) =>
-            $"<color=#7CAEFF>BLUE</color>  {blue} - {red}  <color=#FF8E92>RED</color>";
+            $"<color=#4085DB>BLUE</color>  {blue} - {red}  <color=#E0594A>RED</color>";
 
         public static MatchHud Create()
         {
@@ -81,6 +84,10 @@ namespace PointPass.UI
             hud.BuildControlHint();
             hud.BuildBanner();
             hud.BuildPauseButton();
+            hud.replayCue=hud.Panel(hud.safeAreaRoot,"GoalReplayCue",Ink,new Vector2(0,-185),new Vector2(490,54));
+            hud.replayCue.rectTransform.anchorMin=hud.replayCue.rectTransform.anchorMax=new Vector2(0.5f,1);
+            Label(hud.replayCue.transform,"ReplayStatus","",19,Vector2.zero,new Vector2(470,46),Mint,true);
+            hud.replayCue.gameObject.SetActive(false);
             hud.SetPlayerState(false, false, false);
             return hud;
         }
@@ -123,6 +130,8 @@ namespace PointPass.UI
         public void SetClock(string label, float seconds)
         {
             int total = Mathf.CeilToInt(Mathf.Max(0, seconds));
+            if (total == displayedSeconds && label == displayedPhase) return;
+            displayedSeconds = total; displayedPhase = label;
             phaseText.text = label;
             clockText.text = $"{total / 60}:{total % 60:00}";
             clockText.color = total <= 10 ? Gold : Paper;
@@ -130,6 +139,7 @@ namespace PointPass.UI
 
         public void SetClockText(string text)
         {
+            displayedSeconds = -1; displayedPhase = null;
             phaseText.text = text;
             clockText.text = "--:--";
             clockText.color = Muted;
@@ -137,6 +147,9 @@ namespace PointPass.UI
 
         public void ShowMessage(string text)
         {
+            messageAccent.GetComponent<Image>().color = Mint;
+            Text eyebrow=messageEyebrow.GetComponent<Text>();
+            eyebrow.text="P O I N T P A S S"; eyebrow.color=Mint;
             bannerVisible = !string.IsNullOrEmpty(text);
             if (!bannerVisible) return;
             if (!banner.gameObject.activeSelf) bannerGroup.alpha = 0f;
@@ -151,14 +164,31 @@ namespace PointPass.UI
             messageDetail.rectTransform.anchoredPosition = new Vector2(0, -60);
         }
 
+        public void ShowGoalMessage(Team team,bool ownGoal)
+        {
+            string name=team==Team.Blue ? "BLUE":"RED";
+            ShowMessage("GOAL!\n"+name+(ownGoal ? " SCORE  /  OWN GOAL":" ON THE SCORESHEET"));
+            messageAccent.GetComponent<Image>().color=MatchPalette.TeamColor(team);
+            Text eyebrow=messageEyebrow.GetComponent<Text>();
+            eyebrow.text=name+"  /  GOAL MOMENT";
+            eyebrow.color=Color.Lerp(MatchPalette.TeamColor(team),Paper,0.35f);
+        }
+
+        public void ShowGoalReplayCue(bool saved)
+        {
+            replayCue.gameObject.SetActive(true);
+            replayCue.GetComponentInChildren<Text>().text = saved ? "GOAL REPLAY SAVED  /  WATCH FROM PAUSE" : "REPLAY READY  /  WATCH FROM PAUSE";
+        }
+        public void ClearGoalReplayCue() { if (replayCue!=null) replayCue.gameObject.SetActive(false); }
+
         private void BuildScoreboard()
         {
             scoreRoot = Rect(safeAreaRoot, "Scoreboard");
             Place(scoreRoot, new Vector2(0.5f, 1), new Vector2(0, -26), new Vector2(600, 94), new Vector2(0.5f, 1));
             Panel(scoreRoot, "Background", Ink, Vector2.zero, new Vector2(600, 94));
             // Team accents are deliberately small: colour identifies the sides without filling the HUD.
-            Bar(scoreRoot, "BlueAccent", new Vector2(-284, 0), new Vector2(4, 38), new Color(0.4f, 0.63f, 1));
-            Bar(scoreRoot, "RedAccent", new Vector2(284, 0), new Vector2(4, 38), new Color(1, 0.48f, 0.52f));
+            Bar(scoreRoot, "BlueAccent", new Vector2(-284, 0), new Vector2(4, 38), MatchPalette.Blue);
+            Bar(scoreRoot, "RedAccent", new Vector2(284, 0), new Vector2(4, 38), MatchPalette.Red);
             Label(scoreRoot, "BlueName", "BLUE", 28, new Vector2(-194, 0), new Vector2(130, 42), Paper);
             Label(scoreRoot, "RedName", "RED", 28, new Vector2(194, 0), new Vector2(130, 42), Paper);
             scoreText = Label(scoreRoot, "Score", "0 : 0", 52, Vector2.zero, new Vector2(210, 74), Paper, true);
@@ -188,12 +218,12 @@ namespace PointPass.UI
 
         private void BuildJoystick()
         {
-            Image baseImage = Circle(safeAreaRoot, "JoystickBase", new Color(0.04f, 0.08f, 0.1f, 0.28f), Vector2.zero, 264);
+            Image baseImage = Circle(safeAreaRoot, "JoystickBase", new Color(Ink.r, Ink.g, Ink.b, 0.28f), Vector2.zero, 264);
             Place(baseImage.rectTransform, Vector2.zero, new Vector2(206, 194), new Vector2(264, 264));
             Image rim = Image(baseImage.transform, "Rim", Ring(), new Color(1, 1, 1, 0.26f));
             Stretch(rim.rectTransform);
             Circle(baseImage.transform, "InnerGuide", new Color(1, 1, 1, 0.04f), Vector2.zero, 178);
-            Image handle = Circle(baseImage.transform, "JoystickHandle", new Color(0.92f, 0.97f, 0.98f, 0.75f), Vector2.zero, 96);
+            Image handle = Circle(baseImage.transform, "JoystickHandle", new Color(Paper.r, Paper.g, Paper.b, 0.75f), Vector2.zero, 96);
             Circle(handle.transform, "Centre", new Color(1, 1, 1, 0.35f), Vector2.zero, 14);
             baseImage.raycastTarget = true;
             Joystick = baseImage.gameObject.AddComponent<VirtualJoystick>();
@@ -252,7 +282,7 @@ namespace PointPass.UI
 
         private HoldActionButton BuildAction(string name, Vector2 position, float diameter, Color accent, int icon, out Image charge)
         {
-            Image face = Circle(safeAreaRoot, name + "Button", new Color(0.035f, 0.065f, 0.09f, 0.72f), Vector2.zero, diameter);
+            Image face = Circle(safeAreaRoot, name + "Button", new Color(Ink.r, Ink.g, Ink.b, 0.72f), Vector2.zero, diameter);
             Place(face.rectTransform, new Vector2(1, 0), position, Vector2.one * diameter);
             Image rim = Image(face.transform, "Rim", Ring(), new Color(accent.r, accent.g, accent.b, 0.5f));
             Stretch(rim.rectTransform);
@@ -393,7 +423,7 @@ namespace PointPass.UI
 
         private static Text Label(Transform parent, string name, string content, int size, Vector2 position, Vector2 bounds, Color color, bool bold = false)
         {
-            Text text = Rect(parent, name).gameObject.AddComponent<Text>();
+            Text text = Rect(parent, name).gameObject.AddComponent<SharpText>();
             text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             text.fontSize = size; text.fontStyle = bold ? FontStyle.Bold : FontStyle.Normal;
             text.alignment = TextAnchor.MiddleCenter; text.color = color;
@@ -409,8 +439,8 @@ namespace PointPass.UI
         private static Sprite RoundedPanel()
         {
             if (roundedSprite != null) return roundedSprite;
-            const int size = 64;
-            const float cornerRadius = 16;
+            const int size = 128;
+            const float cornerRadius = 32;
             Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
             texture.name = "HUD Panel";
             texture.wrapMode = TextureWrapMode.Clamp;
@@ -426,14 +456,14 @@ namespace PointPass.UI
                 }
             texture.SetPixels(pixels); texture.Apply();
             roundedSprite = Sprite.Create(texture, new Rect(0, 0, size, size), Vector2.one * 0.5f,
-                100, 0, SpriteMeshType.FullRect, Vector4.one * 18);
+                200, 0, SpriteMeshType.FullRect, Vector4.one * 36);
             return roundedSprite;
         }
 
         private static Sprite Ring()
         {
             if (ringSprite != null) return ringSprite;
-            const int size = 128;
+            const int size = 512;
             Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
             texture.name = "HUD Ring";
             texture.wrapMode = TextureWrapMode.Clamp;
@@ -441,8 +471,8 @@ namespace PointPass.UI
             for (int y = 0; y < size; y++)
                 for (int x = 0; x < size; x++)
                 {
-                    float radius = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), Vector2.one * 64);
-                    float alpha = Mathf.Clamp01(63 - radius) * Mathf.Clamp01(radius - 59);
+                    float radius = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), Vector2.one * 256);
+                    float alpha = Mathf.Clamp01(255 - radius) * Mathf.Clamp01(radius - 247);
                     pixels[y * size + x] = new Color(1, 1, 1, alpha);
                 }
             texture.SetPixels(pixels); texture.Apply();

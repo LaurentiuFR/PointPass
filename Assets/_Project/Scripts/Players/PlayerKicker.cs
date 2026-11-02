@@ -97,6 +97,7 @@ namespace PointPass.Players
             Vector2 velocity = pendingVelocity;
             float curve = pendingCurve;
             controller.Dribbler.ReleaseForKick();
+            ball.RecordTouch(controller);
             ball.Body.linearVelocity = velocity;
             ball.Body.angularVelocity = 0f;
             ball.SetCurve(type == KickType.Shot ? curve : 0f);

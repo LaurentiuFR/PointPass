@@ -41,6 +41,10 @@ namespace PointPass.Players
         private float kickRemaining;
         private float kickStrength;
         private bool kickLeft;
+        private float celebrationAge = 10;
+        public bool IsCelebrating => celebrationAge < 2.6f;
+        public void CelebrateGoal() { celebrationAge = 0; kickRemaining = 0; }
+        public void ClearCelebration() { celebrationAge = 10; ResetPose(); }
 
         /// <summary>0 to 2π. sin(Phase) &gt; 0 means the left foot is forward.</summary>
         public float Phase { get; private set; }
@@ -105,6 +109,11 @@ namespace PointPass.Players
         private void Update()
         {
             if (body == null) return;
+            if (IsCelebrating)
+            {
+                AdvanceCelebration(Time.deltaTime);
+                return;
+            }
             if (!body.simulated)
             {
                 ResetPose();
@@ -143,21 +152,23 @@ namespace PointPass.Players
             if (leftArm != null)
             {
                 leftArm.localPosition = leftArmRest + new Vector3(lean.x * 0.012f,
-                    -step * 0.085f * armStrength - leftStrike * 0.025f, 0);
-                leftArm.localRotation = leftArmRotation * Quaternion.Euler(0, 0,
+                    -step * 0.018f * armStrength - leftStrike * 0.025f, 0);
+                leftArm.localRotation = leftArmRotation * Quaternion.Euler((45f - 75f * Mathf.Sin(Phase)) * Intensity, 0,
                     step * 6f * armStrength + lean.x * 3f - leftStrike * 7f - kick * 5f);
             }
             if (rightArm != null)
             {
                 rightArm.localPosition = rightArmRest + new Vector3(lean.x * 0.012f,
-                    step * 0.085f * armStrength - rightStrike * 0.025f, 0);
-                rightArm.localRotation = rightArmRotation * Quaternion.Euler(0, 0,
+                    step * 0.018f * armStrength - rightStrike * 0.025f, 0);
+                rightArm.localRotation = rightArmRotation * Quaternion.Euler((45f + 75f * Mathf.Sin(Phase)) * Intensity, 0,
                     -step * 6f * armStrength + lean.x * 3f + rightStrike * 7f + kick * 5f);
             }
             // Hands follow a bent elbow rather than rotating the whole arm like a paddle.
             // The forward arm folds more, and a shot opens both arms for balance.
             PoseElbow(leftElbow, -1, -step, armStrength, kick);
             PoseElbow(rightElbow, 1, step, armStrength, kick);
+            SetHandLayer(leftElbow, -step);
+            SetHandLayer(rightElbow, step);
             if (bodyVisual != null)
             {
                 float bounce = 0.014f * Intensity * Mathf.Cos(2f * Phase);
@@ -180,16 +191,58 @@ namespace PointPass.Players
             if (rightArm != null) { rightArm.localPosition = rightArmRest; rightArm.localRotation = rightArmRotation; }
             if (leftElbow != null) { leftElbow.localRotation = Quaternion.identity; leftElbow.localScale = Vector3.one; }
             if (rightElbow != null) { rightElbow.localRotation = Quaternion.identity; rightElbow.localScale = Vector3.one; }
+            SetHandLayer(leftElbow,0); SetHandLayer(rightElbow,0);
         }
 
         private void PoseElbow(Transform elbow, float side, float swing, float strength, float kick)
         {
             if (elbow == null) return;
-            float bend = (15f + 2f * strength + 5f * swing) * Intensity + kick * 8f;
+            float bend = (17f + 2f * strength + 16f * Mathf.Max(0,swing)) * Intensity + kick * 8f;
             elbow.localRotation = Quaternion.Euler(0, 0, -side * bend);
             elbow.localScale = new Vector3(1, 1f - 0.1f * Mathf.Max(0, swing), 1);
         }
 
-        private void OnDisable() => ResetPose();
+        private static void SetHandLayer(Transform elbow,float swing)
+        {
+            if (elbow == null) return;
+            SpriteRenderer hand = elbow.GetComponentInChildren<SpriteRenderer>();
+            if (hand != null) hand.sortingOrder = swing > 0.12f ? 6 : 4;
+        }
+
+        public void AdvanceCelebration(float seconds)
+        {
+            if (!IsCelebrating || seconds<=0) return;
+            celebrationAge += seconds;
+            float blend = Mathf.SmoothStep(0,1,celebrationAge/0.16f)
+                * (1-Mathf.SmoothStep(0,1,Mathf.InverseLerp(2.15f,2.6f,celebrationAge)));
+            float pump = Mathf.Max(0,Mathf.Sin(celebrationAge*8f))*blend;
+            if (bodyVisual != null)
+            {
+                bodyVisual.localPosition = bodyRest + Vector3.up*(0.035f*pump);
+                bodyVisual.localRotation = bodyRotation*Quaternion.Euler(0,0,-5f*blend+3f*pump);
+            }
+            if (leftArm != null)
+            {
+                leftArm.localPosition = leftArmRest + Vector3.up*(0.05f*blend);
+                leftArm.localRotation = leftArmRotation*Quaternion.Euler(0,0,-110f*blend);
+            }
+            if (rightArm != null)
+            {
+                rightArm.localPosition = rightArmRest + Vector3.up*(0.08f*pump);
+                rightArm.localRotation = rightArmRotation*Quaternion.Euler(0,0,(120f+25f*pump)*blend);
+            }
+            if (leftElbow!=null)
+            {
+                leftElbow.localRotation=Quaternion.Euler(0,0,-12f*blend); leftElbow.localScale=Vector3.one;
+            }
+            if (rightElbow!=null)
+            {
+                rightElbow.localRotation=Quaternion.Euler(0,0,12f*blend); rightElbow.localScale=Vector3.one;
+            }
+            SetHandLayer(leftElbow,1); SetHandLayer(rightElbow,1);
+            if (!IsCelebrating) ResetPose();
+        }
+
+        private void OnDisable() => ClearCelebration();
     }
 }
