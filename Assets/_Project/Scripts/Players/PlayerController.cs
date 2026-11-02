@@ -18,7 +18,7 @@ namespace PointPass.Players
         public Vector2 KickoffPosition { get; private set; }
         public float KickoffAngle { get; private set; }
 
-        public PlayerMovement Movement => movement != null ? movement : (movement = GetComponent<PlayerMovement>());
+        private PlayerMovement Movement => movement != null ? movement : (movement = GetComponent<PlayerMovement>());
         public Dribbler Dribbler => dribbler != null ? dribbler : (dribbler = GetComponent<Dribbler>());
         public Rigidbody2D Body => Movement.Body;
 
