@@ -14,16 +14,16 @@ namespace PointPass.Players
     {
         [Header("Pick-up")]
         [SerializeField] private float acquireRadius = 0.85f;
-        [SerializeField] private float releaseRadius = 1.3f;
-        [SerializeField] private float maxPickupSpeed = 9f;
+        [SerializeField] private float releaseRadius = 1.55f;
+        [SerializeField] private float maxPickupSpeed = 11f;
         [SerializeField] private float pickupCooldown = 0.25f;
 
         [Header("Feet")]
         [SerializeField] private float baseLead = 0.64f;   // ball distance in front of his centre
         [SerializeField] private float touchLead = 0.09f;  // extra push on each touch
         [SerializeField] private float sway = 0.07f;       // side-to-side movement toward the active foot
-        [SerializeField] private float followGain = 16f;   // how tightly the ball tracks his feet
-        [SerializeField] private float maxBallSpeed = 12f;
+        [SerializeField] private float followGain = 20f;   // how tightly the ball tracks his feet
+        [SerializeField] private float maxBallSpeed = 14f;
         [SerializeField] private float speedWhileDribbling = 0.92f;
 
         private Ball ball;
@@ -35,6 +35,8 @@ namespace PointPass.Players
         private Collider2D ownCollider;
         private bool carrying;          // local mirror of "possession says I own the ball"
         private float noPickupUntil;
+        private bool waitingForSeparation;
+        private float restoreCollisionAt;
 
         public bool HasBall => possession != null && possession.IsOwner(controller);
 
@@ -56,6 +58,9 @@ namespace PointPass.Players
         private void FixedUpdate()
         {
             if (ball == null || possession == null) return;
+
+            if (waitingForSeparation && (Time.time >= restoreCollisionAt
+                || ownCollider.Distance(ball.Collider).distance > 0.02f)) RestoreCollision();
 
             // Match paused or frozen: let go of everything.
             if (!controller.IsActive)
@@ -80,22 +85,44 @@ namespace PointPass.Players
         {
             possession?.Release(controller);
             StopCarrying();
+            RestoreCollision();
         }
+
+        public void ReleaseForKick()
+        {
+            if (!HasBall) return;
+            possession.Release(controller);
+            carrying = false;
+            movement.SpeedMultiplier = 1f;
+            noPickupUntil = Time.time + pickupCooldown;
+            waitingForSeparation = true;
+            restoreCollisionAt = Time.time + pickupCooldown;
+            Physics2D.IgnoreCollision(ownCollider, ball.Collider, true);
+        }
+
+        private void RestoreCollision()
+        {
+            if (ball != null && ownCollider != null) Physics2D.IgnoreCollision(ownCollider, ball.Collider, false);
+            waitingForSeparation = false;
+        }
+
+        private void OnDisable() => Release();
 
         private void TryPickUp()
         {
-            if (Time.time < noPickupUntil) return;
+            if (waitingForSeparation || Time.time < noPickupUntil) return;
 
             Vector2 ballPosition = ball.Body.position;
             Vector2 toBall = ballPosition - body.position;
 
             if (Vector2.Distance(ballPosition, FeetTarget()) > acquireRadius) return;
-            if (toBall.sqrMagnitude > 0.0001f && Vector2.Dot(toBall.normalized, transform.up) < 0.1f) return; // must be in front
+            if (toBall.sqrMagnitude > 0.0001f && Vector2.Dot(toBall.normalized, Facing()) < 0.1f) return; // must be in front
             if ((ball.Body.linearVelocity - body.linearVelocity).magnitude > maxPickupSpeed) return;
 
             if (!possession.TryAcquire(controller)) return; // somebody else already has it
 
             carrying = true;
+            ball.SetCurve(0f);
             Physics2D.IgnoreCollision(ownCollider, ball.Collider, true);
             movement.SpeedMultiplier = speedWhileDribbling;
         }
@@ -134,7 +161,15 @@ namespace PointPass.Players
             float lead = baseLead + touchLead * intensity * -Mathf.Cos(2f * phase);
             float side = -sway * intensity * Mathf.Sin(phase);
 
-            return body.position + (Vector2)transform.up * lead + (Vector2)transform.right * side;
+            Vector2 forward = Facing();
+            Vector2 right = new Vector2(forward.y, -forward.x);
+            return body.position + forward * lead + right * side;
+        }
+
+        private Vector2 Facing()
+        {
+            float angle = body.rotation * Mathf.Deg2Rad;
+            return new Vector2(-Mathf.Sin(angle), Mathf.Cos(angle));
         }
     }
 }

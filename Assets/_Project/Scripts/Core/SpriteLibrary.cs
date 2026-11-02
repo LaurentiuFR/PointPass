@@ -94,7 +94,7 @@ namespace PointPass.Core
             return whiteSquare;
         }
 
-        private static Sprite WhiteCircle()
+        public static Sprite WhiteCircle()
         {
             if (whiteCircle != null) return whiteCircle;
             const int size = 128;

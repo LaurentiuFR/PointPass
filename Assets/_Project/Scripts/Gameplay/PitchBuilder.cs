@@ -21,9 +21,11 @@ namespace PointPass.Gameplay
             float goalDepth = MatchConfig.GoalDepth;
             float t = 1f; // wall thickness
 
-            // Pitch surface
-            SpriteLibrary.Create(pitch, "Surface", "pitch",
-                new Vector2(MatchConfig.PitchWidth, MatchConfig.PitchHeight), Vector2.zero, -10, new Color(0.2f, 0.6f, 0.28f));
+            // Surrounds and markings are presentation only; the existing colliders below are unchanged.
+            StadiumBuilder.Build(pitch);
+            SpriteRenderer turf = SpriteLibrary.Create(pitch, "Surface", "grass_stadium",
+                new Vector2(MatchConfig.PitchWidth, MatchConfig.PitchHeight), Vector2.zero, -10, new Color(0.2f, 0.5f, 0.24f));
+            turf.color = new Color(0.72f, 0.88f, 0.78f);
 
             // Goals: the open side of the art is its edge, which sits on the goal line
             Color goalPlaceholder = new Color(1f, 1f, 1f, 0.25f);

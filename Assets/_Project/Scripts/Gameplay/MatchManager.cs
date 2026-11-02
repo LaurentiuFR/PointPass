@@ -14,7 +14,7 @@ namespace PointPass.Gameplay
     /// </summary>
     public class MatchManager : MonoBehaviour
     {
-        private enum Phase { Paused, Playing, FullTime }
+        private enum Phase { MainMenu, Paused, Playing, FullTime }
 
         private Ball ball;
         private PossessionSystem possession;
@@ -27,24 +27,57 @@ namespace PointPass.Gameplay
         private int half = 1;
         private bool overtime;
         private float clock;
-        private float fullTimeAt;
+        private MatchMenu menu;
+        private bool userPaused;
+        private float previousTimeScale = 1f;
+
+        public bool IsUserPaused => userPaused;
+        public bool IsInMainMenu => phase == Phase.MainMenu;
 
         public void Init(Ball ball, PossessionSystem possession, List<PlayerController> players, MatchHud hud)
         {
+            if (this.hud != null) this.hud.PauseRequested -= PauseMatch;
             this.ball = ball;
             this.possession = possession;
             this.players = players;
             this.hud = hud;
+            hud.PauseRequested += PauseMatch;
+        }
+
+        public void SetMenu(MatchMenu menu)
+        {
+            UnsubscribeMenu();
+            this.menu = menu;
+            if (menu == null) return;
+            menu.PlayRequested += StartMatch;
+            menu.ResumeRequested += ResumeMatch;
+            menu.RestartRequested += StartMatch;
+            menu.MainMenuRequested += OpenMainMenu;
+        }
+
+        private void UnsubscribeMenu()
+        {
+            if (menu == null) return;
+            menu.PlayRequested -= StartMatch;
+            menu.ResumeRequested -= ResumeMatch;
+            menu.RestartRequested -= StartMatch;
+            menu.MainMenuRequested -= OpenMainMenu;
         }
 
         private void Start()
         {
-            StartMatch();
+            if (menu != null) OpenMainMenu();
+            else StartMatch();
         }
 
-        private void StartMatch()
+        public void StartMatch()
         {
             StopAllCoroutines();
+            RestoreGameTime();
+            menu?.Hide();
+            hud.gameObject.SetActive(true);
+            SetPlayerInput(true);
+            phase = Phase.Paused;
             blueScore = 0;
             redScore = 0;
             half = 1;
@@ -56,7 +89,7 @@ namespace PointPass.Gameplay
 
         public void OnGoal(Team scoringTeam)
         {
-            if (phase != Phase.Playing) return;
+            if (phase != Phase.Playing || userPaused) return;
 
             if (scoringTeam == Team.Blue) blueScore++;
             else redScore++;
@@ -68,6 +101,15 @@ namespace PointPass.Gameplay
 
         private void Update()
         {
+            bool pausePress = (Keyboard.current != null && Keyboard.current.pKey.wasPressedThisFrame)
+                || (Gamepad.current != null && Gamepad.current.startButton.wasPressedThisFrame);
+            if (pausePress && menu != null)
+            {
+                if (userPaused) ResumeMatch();
+                else PauseMatch();
+                return;
+            }
+            if (userPaused) return;
             if (phase == Phase.Playing)
             {
                 clock -= Time.deltaTime;
@@ -81,9 +123,56 @@ namespace PointPass.Gameplay
                 }
                 UpdateClock();
             }
-            else if (phase == Phase.FullTime && Time.time > fullTimeAt + 1f && AnyPress())
+        }
+
+        public void OpenMainMenu()
+        {
+            StopAllCoroutines();
+            RestoreGameTime();
+            phase = Phase.MainMenu;
+            SetPlayerInput(false);
+            // Clear momentum while bodies are simulated, then freeze the abandoned match.
+            SetPlaying(true);
+            ResetPositions();
+            SetPlaying(false);
+            hud.ShowMessage(string.Empty);
+            hud.gameObject.SetActive(false);
+            menu?.ShowMain();
+        }
+
+        public void PauseMatch()
+        {
+            if (menu == null || userPaused || (phase != Phase.Playing && phase != Phase.Paused)) return;
+            previousTimeScale = Time.timeScale;
+            userPaused = true;
+            Time.timeScale = 0f;
+            SetPlayerInput(false);
+            hud.gameObject.SetActive(false);
+            menu.ShowPause();
+        }
+
+        public void ResumeMatch()
+        {
+            if (!userPaused) return;
+            RestoreGameTime();
+            menu?.Hide();
+            hud.gameObject.SetActive(true);
+            SetPlayerInput(true);
+        }
+
+        private void RestoreGameTime()
+        {
+            if (userPaused) Time.timeScale = previousTimeScale;
+            userPaused = false;
+        }
+
+        private void SetPlayerInput(bool enabled)
+        {
+            foreach (PlayerController player in players)
             {
-                StartMatch();
+                if (player == null) continue;
+                player.SetInputEnabled(enabled);
+                player.GetComponent<HumanPlayerInput>()?.SuppressUntilRelease();
             }
         }
 
@@ -153,11 +242,17 @@ namespace PointPass.Gameplay
 
         private void EndMatch()
         {
+            RestoreGameTime();
             phase = Phase.FullTime;
-            fullTimeAt = Time.time;
+            SetPlayerInput(false);
             SetPlaying(false);
             hud.SetClockText("FULL TIME");
-            hud.ShowMessage("FULL TIME\n" + MatchHud.ScoreLine(blueScore, redScore) + "\nTap to play again");
+            if (menu != null)
+            {
+                hud.gameObject.SetActive(false);
+                menu.ShowResults(blueScore, redScore);
+            }
+            else hud.ShowMessage("FULL TIME\n" + MatchHud.ScoreLine(blueScore, redScore));
         }
 
         // Every player returns to his kick-off spot and the ball becomes free.
@@ -167,6 +262,7 @@ namespace PointPass.Gameplay
             ball.ResetTo(Vector2.zero);
             foreach (PlayerController player in players)
             {
+                if (player == null) continue;
                 player.ResetToKickoff();
             }
         }
@@ -177,6 +273,7 @@ namespace PointPass.Gameplay
             ball.Body.simulated = playing;
             foreach (PlayerController player in players)
             {
+                if (player == null) continue;
                 player.SetActive(playing);
             }
         }
@@ -187,11 +284,28 @@ namespace PointPass.Gameplay
             hud.SetClock(label, clock);
         }
 
-        private static bool AnyPress()
+        private void OnApplicationPause(bool paused)
         {
-            bool pointer = Pointer.current != null && Pointer.current.press.wasPressedThisFrame;
-            bool space = Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame;
-            return pointer || space;
+            if (paused) PauseMatch();
+        }
+
+        private void OnApplicationFocus(bool focused)
+        {
+            if (!focused) PauseMatch();
+        }
+
+        private void OnDisable()
+        {
+            RestoreGameTime();
+            if (players != null) SetPlayerInput(false);
+            if (ball != null && players != null) SetPlaying(false);
+        }
+
+        private void OnDestroy()
+        {
+            RestoreGameTime();
+            UnsubscribeMenu();
+            if (hud != null) hud.PauseRequested -= PauseMatch;
         }
     }
 }

@@ -10,7 +10,7 @@ namespace PointPass.Core
 {
     /// <summary>
     /// Builds the whole match when you press Play. No setup in the editor needed:
-    /// just open any scene and press Play. (A scene named "MainMenu" is skipped.)
+    /// just open any scene and press Play. The runtime main menu opens before the match.
     /// </summary>
     public static class MatchBootstrap
     {
@@ -18,7 +18,6 @@ namespace PointPass.Core
         private static void Run()
         {
             Scene scene = SceneManager.GetActiveScene();
-            if (scene.name == "MainMenu") return;
 
             ClearOldSceneObjects(scene);
             Physics2D.gravity = Vector2.zero;
@@ -36,9 +35,11 @@ namespace PointPass.Core
             List<PlayerController> roster = new List<PlayerController> { human };
 
             MatchHud hud = MatchHud.Create();
-            human.gameObject.AddComponent<HumanPlayerInput>().Init(hud.Joystick);
+            human.gameObject.AddComponent<HumanPlayerInput>().Init(hud);
+            human.gameObject.AddComponent<PlayerAimGuide>().Init(ball);
 
             manager.Init(ball, possession, roster, hud);
+            manager.SetMenu(MatchMenu.Create());
         }
 
         // Removes leftovers from hand-built scenes. Keeps cameras, lights and the EventSystem.
@@ -94,7 +95,7 @@ namespace PointPass.Core
 
             Vector2 ballSize = Vector2.one * MatchConfig.BallDiameter;
             SpriteLibrary.Create(go.transform, "Shadow", "shadow", ballSize * 1.7f, Vector2.zero, 2, Color.black, true, true);
-            SpriteRenderer sprite = SpriteLibrary.Create(go.transform, "Sprite", "ball", ballSize, Vector2.zero, 6, Color.white, true);
+            SpriteRenderer sprite = SpriteLibrary.Create(go.transform, "Sprite", "ball_polished", ballSize * 1.12f, Vector2.zero, 6, Color.white, true);
             ball.SetVisual(sprite.transform);
             return ball;
         }
@@ -123,25 +124,41 @@ namespace PointPass.Core
 
             Vector2 size = Vector2.one * MatchConfig.PlayerDiameter;
             Color teamColor = team == Team.Blue ? MatchConfig.BlueTeam : MatchConfig.RedTeam;
-            string spriteName = team == Team.Blue ? "player_blue" : "player_red";
+            string spriteName = team == Team.Blue ? "player_blue_rigged" : "player_red_rigged";
 
             SpriteLibrary.Create(go.transform, "Shadow", "shadow", size * 1.5f, Vector2.zero, 1, Color.black, true, true);
 
             // Boots sit under the body so they tuck in and poke out as he runs
             Color bootColor = new Color(0.1f, 0.1f, 0.1f);
-            Vector2 bootSize = new Vector2(0.2f, 0.3f);
-            SpriteRenderer leftBoot = SpriteLibrary.Create(go.transform, "BootLeft", "boot", bootSize,
+            Vector2 bootSize = new Vector2(0.32f, 0.36f);
+            SpriteRenderer leftBoot = SpriteLibrary.Create(go.transform, "BootLeft", "boot_polished", bootSize,
                 new Vector2(-PlayerAnimator.BootSpread, PlayerAnimator.BootRestY), 4, bootColor);
-            SpriteRenderer rightBoot = SpriteLibrary.Create(go.transform, "BootRight", "boot", bootSize,
+            SpriteRenderer rightBoot = SpriteLibrary.Create(go.transform, "BootRight", "boot_polished", bootSize,
                 new Vector2(PlayerAnimator.BootSpread, PlayerAnimator.BootRestY), 4, bootColor);
             SpriteRenderer bodySprite = SpriteLibrary.Create(go.transform, "Sprite", spriteName, size, Vector2.zero, 5, teamColor, true);
+            Transform leftArm = CreateArm(go.transform, true);
+            Transform rightArm = CreateArm(go.transform, false);
 
             PlayerAnimator animator = go.AddComponent<PlayerAnimator>();
-            animator.Init(leftBoot.transform, rightBoot.transform, bodySprite.transform);
+            animator.Init(leftBoot.transform, rightBoot.transform, bodySprite.transform, leftArm, rightArm);
 
             Dribbler dribbler = go.AddComponent<Dribbler>();
             dribbler.Init(ball, possession, animator);
+            PlayerKicker kicker = go.AddComponent<PlayerKicker>();
+            kicker.Init(ball, possession);
+            kicker.Kicked += animator.PlayKick;
             return controller;
+        }
+
+        private static Transform CreateArm(Transform player, bool left)
+        {
+            Transform pivot = new GameObject(left ? "LeftArm" : "RightArm").transform;
+            pivot.SetParent(player, false);
+            pivot.localPosition = new Vector3(left ? -0.36f : 0.36f, -0.1f, 0);
+            SpriteRenderer arm = SpriteLibrary.Create(pivot, "Forearm", "arm_runner", new Vector2(0.3f, 0.3f),
+                new Vector2(0, -0.12f), 4, new Color(0.8f, 0.55f, 0.3f), true);
+            arm.flipX = left;
+            return pivot;
         }
     }
 }

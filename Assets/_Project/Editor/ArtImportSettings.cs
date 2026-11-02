@@ -20,6 +20,9 @@ namespace PointPass.EditorTools
             importer.filterMode = UnityEngine.FilterMode.Bilinear;
             importer.alphaIsTransparency = true;
             importer.textureCompression = TextureImporterCompression.Uncompressed;
+            // New game-scale character/ball art does not need its full generation resolution.
+            if (assetPath.EndsWith("_polished.png") || assetPath.EndsWith("_rigged.png") || assetPath.EndsWith("arm_runner.png"))
+                importer.maxTextureSize = 512;
         }
     }
 }

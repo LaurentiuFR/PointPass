@@ -1,4 +1,6 @@
+using System;
 using PointPass.Core;
+using PointPass.Players;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
@@ -6,259 +8,446 @@ using UnityEngine.UI;
 
 namespace PointPass.UI
 {
-    /// <summary>Builds and drives the on-screen HUD: scoreboard, clock, joystick and big messages.</summary>
+    /// <summary>Runtime match presentation. Gameplay and input remain in their own components.</summary>
     public class MatchHud : MonoBehaviour
     {
-        private const string BlueHex = "#6C9BFF";
-        private const string RedHex = "#FF7B7B";
-        private const string DashHex = "#7A859C";
-
-        private static readonly Color PanelColor = new Color(0.07f, 0.09f, 0.14f, 0.94f);
-        private static readonly Color BannerColor = new Color(0.03f, 0.05f, 0.08f, 0.72f);
-        private static readonly Color ClockNormal = new Color(0.92f, 0.95f, 1f);
-        private static readonly Color ClockUrgent = new Color(1f, 0.42f, 0.42f);
+        private static readonly Color Ink = new Color(0.035f, 0.065f, 0.09f, 0.98f);
+        private static readonly Color Paper = new Color(0.94f, 0.97f, 0.98f);
+        private static readonly Color Muted = new Color(0.62f, 0.72f, 0.77f);
+        private static readonly Color Mint = new Color(0.52f, 0.94f, 0.76f);
+        private static readonly Color Gold = new Color(1f, 0.8f, 0.43f);
+        private static Sprite ringSprite;
+        private static Sprite roundedSprite;
 
         private Sprite panelSprite;
         private Text scoreText;
         private Text clockText;
+        private Text phaseText;
         private Text messageText;
+        private Text messageDetail;
+        private RectTransform messageEyebrow;
+        private RectTransform messageAccent;
         private RectTransform banner;
+        private CanvasGroup bannerGroup;
+        private bool bannerVisible;
+        private RectTransform scoreRoot;
+        private float scorePulse;
+        private int lastBlue;
+        private int lastRed;
+        private Image chargeFill;
+        private Image passCharge;
+        private Image shotCharge;
+        private Text chargeLabel;
+        private RectTransform safeAreaRoot;
+        private Rect lastSafeArea;
+        private Vector2Int lastScreenSize;
+        private CanvasGroup passAvailability;
+        private CanvasGroup shotAvailability;
+        private CanvasGroup sprintAvailability;
+        private Text controlHint;
+        private float kickAvailabilityTarget = 0.3f;
+        private float sprintAvailabilityTarget = 0.3f;
+        private bool playerStateInitialized;
+        private bool playerActive;
+        private bool playerHasBall;
+        private bool playerUsingGamepad;
 
         public VirtualJoystick Joystick { get; private set; }
+        public HoldActionButton PassButton { get; private set; }
+        public HoldActionButton ShootButton { get; private set; }
+        public HoldActionButton SprintButton { get; private set; }
+        public event Action PauseRequested;
 
-        public static string ScoreLine(int blue, int red)
-        {
-            return $"<color={BlueHex}>BLUE</color>  {blue} - {red}  <color={RedHex}>RED</color>";
-        }
+        public static string ScoreLine(int blue, int red) =>
+            $"<color=#7CAEFF>BLUE</color>  {blue} - {red}  <color=#FF8E92>RED</color>";
 
         public static MatchHud Create()
         {
-            GameObject canvasObject = new GameObject("HUD");
-            Canvas canvas = canvasObject.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-
-            CanvasScaler scaler = canvasObject.AddComponent<CanvasScaler>();
+            GameObject go = new GameObject("HUD", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+            go.GetComponent<Canvas>().renderMode = RenderMode.ScreenSpaceOverlay;
+            CanvasScaler scaler = go.GetComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1920f, 1080f);
-            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-            scaler.matchWidthOrHeight = 0.5f;
-
-            canvasObject.AddComponent<GraphicRaycaster>();
-            MatchHud hud = canvasObject.AddComponent<MatchHud>();
-
+            scaler.referenceResolution = new Vector2(1920, 1080);
+            // Fit the shorter landscape dimension, retaining comfortable thumb targets on wide phones.
+            scaler.matchWidthOrHeight = 1f;
+            MatchHud hud = go.AddComponent<MatchHud>();
+            hud.safeAreaRoot = Rect(go.transform, "SafeArea");
+            hud.ApplySafeArea();
             EnsureEventSystem();
-            hud.panelSprite = SpriteLibrary.GetSliced("ui_panel", 44f);
+            hud.panelSprite = RoundedPanel();
             hud.BuildScoreboard();
-            hud.BuildClock();
             hud.BuildJoystick();
+            hud.BuildActions();
+            hud.BuildControlHint();
             hud.BuildBanner();
+            hud.BuildPauseButton();
+            hud.SetPlayerState(false, false, false);
             return hud;
+        }
+
+        private void Update()
+        {
+            if (Screen.safeArea != lastSafeArea || Screen.width != lastScreenSize.x
+                || Screen.height != lastScreenSize.y) ApplySafeArea();
+
+            float feedbackStep = Time.unscaledDeltaTime * 5f;
+            if (passAvailability != null) passAvailability.alpha = Mathf.MoveTowards(passAvailability.alpha, kickAvailabilityTarget, feedbackStep);
+            if (shotAvailability != null) shotAvailability.alpha = Mathf.MoveTowards(shotAvailability.alpha, kickAvailabilityTarget, feedbackStep);
+            if (sprintAvailability != null) sprintAvailability.alpha = Mathf.MoveTowards(sprintAvailability.alpha, sprintAvailabilityTarget, feedbackStep);
+
+            scorePulse = Mathf.MoveTowards(scorePulse, 0f, Time.unscaledDeltaTime * 3f);
+            if (scoreRoot != null) scoreRoot.localScale = Vector3.one * (1f + 0.06f * Mathf.Sin(scorePulse * Mathf.PI));
+            if (bannerGroup == null || !banner.gameObject.activeSelf) return;
+            bannerGroup.alpha = Mathf.MoveTowards(bannerGroup.alpha, bannerVisible ? 1f : 0f, Time.unscaledDeltaTime * 7f);
+            banner.localScale = Vector3.one * Mathf.Lerp(0.97f, 1f, bannerGroup.alpha);
+            if (!bannerVisible && bannerGroup.alpha <= 0f) banner.gameObject.SetActive(false);
+        }
+
+        private void ApplySafeArea()
+        {
+            if (Screen.width <= 0 || Screen.height <= 0) return;
+            lastSafeArea = Screen.safeArea;
+            lastScreenSize = new Vector2Int(Screen.width, Screen.height);
+            safeAreaRoot.anchorMin = new Vector2(lastSafeArea.xMin / Screen.width, lastSafeArea.yMin / Screen.height);
+            safeAreaRoot.anchorMax = new Vector2(lastSafeArea.xMax / Screen.width, lastSafeArea.yMax / Screen.height);
+            safeAreaRoot.offsetMin = safeAreaRoot.offsetMax = Vector2.zero;
         }
 
         public void SetScore(int blue, int red)
         {
-            scoreText.text = $"{blue}<color={DashHex}>  -  </color>{red}";
+            if (blue != lastBlue || red != lastRed) scorePulse = 1f;
+            lastBlue = blue; lastRed = red;
+            scoreText.text = $"{blue} <color=#637780>:</color> {red}";
         }
 
         public void SetClock(string label, float seconds)
         {
-            int total = Mathf.CeilToInt(Mathf.Max(0f, seconds));
-            clockText.text = $"{label}   {total / 60}:{total % 60:00}";
-            clockText.color = total <= 10 ? ClockUrgent : ClockNormal;
+            int total = Mathf.CeilToInt(Mathf.Max(0, seconds));
+            phaseText.text = label;
+            clockText.text = $"{total / 60}:{total % 60:00}";
+            clockText.color = total <= 10 ? Gold : Paper;
         }
 
         public void SetClockText(string text)
         {
-            clockText.text = text;
-            clockText.color = ClockNormal;
+            phaseText.text = text;
+            clockText.text = "--:--";
+            clockText.color = Muted;
         }
 
         public void ShowMessage(string text)
         {
-            bool visible = !string.IsNullOrEmpty(text);
-            banner.gameObject.SetActive(visible);
-            if (!visible) return;
-
-            bool multiLine = text.Contains("\n");
-            messageText.text = text;
-            messageText.fontSize = multiLine ? 62 : 110;
-            banner.sizeDelta = new Vector2(1200f, multiLine ? 380f : 260f);
+            bannerVisible = !string.IsNullOrEmpty(text);
+            if (!bannerVisible) return;
+            if (!banner.gameObject.activeSelf) bannerGroup.alpha = 0f;
+            banner.gameObject.SetActive(true);
+            int lineBreak = text.IndexOf('\n');
+            messageText.text = lineBreak < 0 ? text : text.Substring(0, lineBreak);
+            messageDetail.text = lineBreak < 0 ? "" : text.Substring(lineBreak + 1);
+            banner.sizeDelta = new Vector2(660, lineBreak < 0 ? 164 : 270);
+            messageEyebrow.anchoredPosition = new Vector2(0, lineBreak < 0 ? 48 : 94);
+            messageAccent.anchoredPosition = new Vector2(0, lineBreak < 0 ? -56 : 119);
+            messageText.rectTransform.anchoredPosition = new Vector2(0, lineBreak < 0 ? 0 : 35);
+            messageDetail.rectTransform.anchoredPosition = new Vector2(0, -60);
         }
 
-        private static void EnsureEventSystem()
-        {
-            EventSystem eventSystem = FindFirstObjectByType<EventSystem>();
-            if (eventSystem == null)
-            {
-                eventSystem = new GameObject("EventSystem").AddComponent<EventSystem>();
-            }
-
-            StandaloneInputModule oldModule = eventSystem.GetComponent<StandaloneInputModule>();
-            if (oldModule != null)
-            {
-                oldModule.enabled = false;
-                Destroy(oldModule);
-            }
-
-            if (eventSystem.GetComponent<InputSystemUIInputModule>() == null)
-            {
-                InputSystemUIInputModule module = eventSystem.gameObject.AddComponent<InputSystemUIInputModule>();
-                module.AssignDefaultActions();
-            }
-        }
-
-        // ---- Scoreboard: dark panel, a coloured block per team, big score in the middle ----
         private void BuildScoreboard()
         {
-            RectTransform root = MakeRect(transform, "Scoreboard");
-            root.anchorMin = new Vector2(0.5f, 1f);
-            root.anchorMax = new Vector2(0.5f, 1f);
-            root.pivot = new Vector2(0.5f, 1f);
-            root.anchoredPosition = new Vector2(0f, -24f);
-            root.sizeDelta = new Vector2(840f, 112f);
+            scoreRoot = Rect(safeAreaRoot, "Scoreboard");
+            Place(scoreRoot, new Vector2(0.5f, 1), new Vector2(0, -26), new Vector2(600, 94), new Vector2(0.5f, 1));
+            Panel(scoreRoot, "Background", Ink, Vector2.zero, new Vector2(600, 94));
+            // Team accents are deliberately small: colour identifies the sides without filling the HUD.
+            Bar(scoreRoot, "BlueAccent", new Vector2(-284, 0), new Vector2(4, 38), new Color(0.4f, 0.63f, 1));
+            Bar(scoreRoot, "RedAccent", new Vector2(284, 0), new Vector2(4, 38), new Color(1, 0.48f, 0.52f));
+            Label(scoreRoot, "BlueName", "BLUE", 28, new Vector2(-194, 0), new Vector2(130, 42), Paper);
+            Label(scoreRoot, "RedName", "RED", 28, new Vector2(194, 0), new Vector2(130, 42), Paper);
+            scoreText = Label(scoreRoot, "Score", "0 : 0", 52, Vector2.zero, new Vector2(210, 74), Paper, true);
+            Image divider = Bar(scoreRoot, "LeftDivider", new Vector2(-110, 0), new Vector2(1, 34), new Color(1, 1, 1, 0.12f));
+            Bar(scoreRoot, "RightDivider", new Vector2(110, 0), new Vector2(1, 34), divider.color);
 
-            Image background = MakePanel(root, "Background", PanelColor);
-            Stretch(background.rectTransform);
-            Shadow shadow = background.gameObject.AddComponent<Shadow>();
-            shadow.effectColor = new Color(0f, 0f, 0f, 0.4f);
-            shadow.effectDistance = new Vector2(0f, -6f);
-
-            BuildTeamBlock(root, "BlueBlock", "BLUE", MatchConfig.BlueTeam, true);
-            BuildTeamBlock(root, "RedBlock", "RED", MatchConfig.RedTeam, false);
-
-            scoreText = MakeText(root, "Score", 78, Vector2.zero, Vector2.one);
-            scoreText.rectTransform.offsetMin = new Vector2(270f, 0f);
-            scoreText.rectTransform.offsetMax = new Vector2(-270f, 0f);
-            SetScore(0, 0);
+            Image clockPanel = Panel(safeAreaRoot, "ClockPill", Ink, Vector2.zero, new Vector2(300, 46));
+            Place(clockPanel.rectTransform, new Vector2(0.5f, 1), new Vector2(0, -126), new Vector2(300, 46), new Vector2(0.5f, 1));
+            phaseText = Label(clockPanel.transform, "Phase", "1ST HALF", 20, new Vector2(-54, 0), new Vector2(156, 36), Muted);
+            Bar(clockPanel.transform, "Divider", new Vector2(36, 0), new Vector2(1, 20), new Color(1, 1, 1, 0.15f));
+            clockText = Label(clockPanel.transform, "Time", "1:30", 25, new Vector2(92, 0), new Vector2(92, 36), Paper, true);
         }
 
-        private void BuildTeamBlock(RectTransform parent, string objectName, string teamName, Color color, bool left)
+        private void BuildPauseButton()
         {
-            Image block = MakePanel(parent, objectName, color);
-            RectTransform rect = block.rectTransform;
-            float anchorX = left ? 0f : 1f;
-            rect.anchorMin = new Vector2(anchorX, 0.5f);
-            rect.anchorMax = new Vector2(anchorX, 0.5f);
-            rect.pivot = new Vector2(anchorX, 0.5f);
-            rect.anchoredPosition = new Vector2(left ? 8f : -8f, 0f);
-            rect.sizeDelta = new Vector2(250f, 96f);
-
-            Text label = MakeText(rect, "Name", 46, Vector2.zero, Vector2.one);
-            label.text = teamName;
-        }
-
-        private void BuildClock()
-        {
-            Image pill = MakePanel(transform, "ClockPill", PanelColor);
-            RectTransform rect = pill.rectTransform;
-            rect.anchorMin = new Vector2(0.5f, 1f);
-            rect.anchorMax = new Vector2(0.5f, 1f);
-            rect.pivot = new Vector2(0.5f, 1f);
-            rect.anchoredPosition = new Vector2(0f, -144f);
-            rect.sizeDelta = new Vector2(330f, 58f);
-
-            clockText = MakeText(rect, "Clock", 32, Vector2.zero, Vector2.one);
-            SetClock("1ST HALF", MatchConfig.HalfSeconds);
+            Image face = Panel(safeAreaRoot, "PauseButton", Ink, Vector2.zero, new Vector2(72, 64));
+            Place(face.rectTransform, new Vector2(1, 1), new Vector2(-62, -58), new Vector2(72, 64));
+            face.raycastTarget = true;
+            Bar(face.transform, "LeftBar", new Vector2(-8, 0), new Vector2(5, 24), Paper);
+            Bar(face.transform, "RightBar", new Vector2(8, 0), new Vector2(5, 24), Paper);
+            Button button = face.gameObject.AddComponent<Button>();
+            button.targetGraphic = face;
+            button.onClick.AddListener(() => PauseRequested?.Invoke());
+            // The HUD pause button is pointer/shortcut operated; menu buttons own pad focus.
+            button.navigation = new Navigation { mode = Navigation.Mode.None };
         }
 
         private void BuildJoystick()
         {
-            Image baseImage = MakeImage(transform, "JoystickBase", SpriteLibrary.Get("joystick_base", true), Color.white);
-            RectTransform baseRect = baseImage.rectTransform;
-            baseRect.anchorMin = Vector2.zero;
-            baseRect.anchorMax = Vector2.zero;
-            baseRect.pivot = new Vector2(0.5f, 0.5f);
-            baseRect.anchoredPosition = new Vector2(300f, 300f);
-            baseRect.sizeDelta = new Vector2(340f, 340f);
-
-            Image handleImage = MakeImage(baseImage.transform, "JoystickHandle", SpriteLibrary.Get("joystick_handle", true), Color.white);
-            handleImage.raycastTarget = false;
-            RectTransform handleRect = handleImage.rectTransform;
-            handleRect.anchorMin = new Vector2(0.5f, 0.5f);
-            handleRect.anchorMax = new Vector2(0.5f, 0.5f);
-            handleRect.pivot = new Vector2(0.5f, 0.5f);
-            handleRect.anchoredPosition = Vector2.zero;
-            handleRect.sizeDelta = new Vector2(140f, 140f);
-
+            Image baseImage = Circle(safeAreaRoot, "JoystickBase", new Color(0.04f, 0.08f, 0.1f, 0.28f), Vector2.zero, 264);
+            Place(baseImage.rectTransform, Vector2.zero, new Vector2(206, 194), new Vector2(264, 264));
+            Image rim = Image(baseImage.transform, "Rim", Ring(), new Color(1, 1, 1, 0.26f));
+            Stretch(rim.rectTransform);
+            Circle(baseImage.transform, "InnerGuide", new Color(1, 1, 1, 0.04f), Vector2.zero, 178);
+            Image handle = Circle(baseImage.transform, "JoystickHandle", new Color(0.92f, 0.97f, 0.98f, 0.75f), Vector2.zero, 96);
+            Circle(handle.transform, "Centre", new Color(1, 1, 1, 0.35f), Vector2.zero, 14);
+            baseImage.raycastTarget = true;
             Joystick = baseImage.gameObject.AddComponent<VirtualJoystick>();
-            Joystick.Init(baseRect, handleRect);
+            Joystick.Init(baseImage.rectTransform, handle.rectTransform);
         }
 
-        // ---- Big centre banner for GOAL!, HALF TIME, FULL TIME ----
+        private void BuildActions()
+        {
+            PassButton = BuildAction("Pass", new Vector2(-338, 170), 168, Mint, 0, out passCharge);
+            ShootButton = BuildAction("Shoot", new Vector2(-158, 314), 184, Gold, 1, out shotCharge);
+            SprintButton = BuildAction("Sprint", new Vector2(-132, 108), 140, Paper, 2, out _);
+            // Only opacity changes. Touch ownership and release/cancel events remain intact.
+            passAvailability = PassButton.gameObject.AddComponent<CanvasGroup>();
+            shotAvailability = ShootButton.gameObject.AddComponent<CanvasGroup>();
+            sprintAvailability = SprintButton.gameObject.AddComponent<CanvasGroup>();
+            Image track = Panel(safeAreaRoot, "Charge", Ink, Vector2.zero, new Vector2(324, 56));
+            Place(track.rectTransform, new Vector2(1, 0), new Vector2(-68, 444), new Vector2(324, 56), new Vector2(1, 0));
+            chargeLabel = Label(track.transform, "Label", "PASS", 20, new Vector2(0, 6), new Vector2(280, 30), Paper);
+            Bar(track.transform, "Track", new Vector2(0, -15), new Vector2(276, 3), new Color(1, 1, 1, 0.12f));
+            chargeFill = Bar(track.transform, "Fill", new Vector2(0, -15), new Vector2(276, 3), Mint);
+            chargeFill.type = UnityEngine.UI.Image.Type.Filled;
+            chargeFill.fillMethod = UnityEngine.UI.Image.FillMethod.Horizontal;
+            chargeFill.fillOrigin = 0;
+            SetCharge(PlayerKicker.KickType.None, 0);
+        }
+
+        private void BuildControlHint()
+        {
+            Image plate = Panel(safeAreaRoot, "ControlHint", new Color(Ink.r, Ink.g, Ink.b, 0.72f), Vector2.zero, new Vector2(660, 38));
+            Place(plate.rectTransform, new Vector2(0.5f, 0), new Vector2(0, 30), new Vector2(660, 38));
+            controlHint = Label(plate.transform, "Hint", "", 19, Vector2.zero, new Vector2(630, 32), Muted);
+        }
+
+        /// <summary>Presentation only: explains possession and shows which actions are useful.</summary>
+        public void SetPlayerState(bool active, bool hasBall, bool usingGamepad)
+        {
+            if (playerStateInitialized && playerActive == active && playerHasBall == hasBall
+                && playerUsingGamepad == usingGamepad) return;
+            playerStateInitialized = true;
+            playerActive = active;
+            playerHasBall = hasBall;
+            playerUsingGamepad = usingGamepad;
+            kickAvailabilityTarget = !active ? 0.25f : hasBall ? 1f : 0.42f;
+            sprintAvailabilityTarget = active ? 1f : 0.25f;
+            controlHint.transform.parent.gameObject.SetActive(active);
+            if (!active) return;
+
+            controlHint.color = hasBall ? Mint : Muted;
+            if (Application.isMobilePlatform)
+                controlHint.text = hasBall ? "HOLD TO CHARGE  /  FLICK FROM SHOOT TO BEND" : "COLLECT THE BALL  /  SPRINT TO GET THERE";
+            else if (usingGamepad)
+                controlHint.text = hasBall ? "HOLD SOUTH: PASS  /  EAST: SHOOT  /  RIGHT STICK: BEND" : "COLLECT THE BALL  /  RB: SPRINT";
+            else
+                controlHint.text = hasBall ? "HOLD J: PASS  /  K: SHOOT  /  Q-E: BEND  /  ESC: CANCEL" : "COLLECT THE BALL  /  SHIFT: SPRINT";
+        }
+
+        private HoldActionButton BuildAction(string name, Vector2 position, float diameter, Color accent, int icon, out Image charge)
+        {
+            Image face = Circle(safeAreaRoot, name + "Button", new Color(0.035f, 0.065f, 0.09f, 0.72f), Vector2.zero, diameter);
+            Place(face.rectTransform, new Vector2(1, 0), position, Vector2.one * diameter);
+            Image rim = Image(face.transform, "Rim", Ring(), new Color(accent.r, accent.g, accent.b, 0.5f));
+            Stretch(rim.rectTransform);
+            charge = Image(face.transform, "PowerRing", Ring(), accent);
+            Stretch(charge.rectTransform);
+            charge.type = UnityEngine.UI.Image.Type.Filled;
+            charge.fillMethod = UnityEngine.UI.Image.FillMethod.Radial360;
+            charge.fillOrigin = 2;
+            charge.fillAmount = 0;
+            Label(face.transform, "Label", name.ToUpperInvariant(), 23, new Vector2(0, -diameter * 0.22f), new Vector2(diameter, 34), Paper, true);
+            RectTransform symbol = Rect(face.transform, "Symbol");
+            Place(symbol, Vector2.one * 0.5f, new Vector2(0, 17), new Vector2(64, 54));
+            if (icon == 0)
+            {
+                Line(symbol, new Vector2(-22, -11), new Vector2(23, 13), 4, accent);
+                Line(symbol, new Vector2(23, 13), new Vector2(5, 16), 4, accent);
+                Line(symbol, new Vector2(23, 13), new Vector2(16, -5), 4, accent);
+                Line(symbol, new Vector2(-25, -22), new Vector2(-7, -13), 3, accent * new Color(1, 1, 1, 0.5f));
+            }
+            else if (icon == 1)
+            {
+                Image target = Image(symbol, "Target", Ring(), accent);
+                Place(target.rectTransform, Vector2.one * 0.5f, Vector2.zero, Vector2.one * 43);
+                Circle(symbol, "Centre", accent, Vector2.zero, 8);
+                Line(symbol, new Vector2(-29, 0), new Vector2(-17, 0), 3, accent);
+                Line(symbol, new Vector2(17, 0), new Vector2(29, 0), 3, accent);
+                Line(symbol, new Vector2(0, -29), new Vector2(0, -17), 3, accent);
+                Line(symbol, new Vector2(0, 17), new Vector2(0, 29), 3, accent);
+            }
+            else
+            {
+                for (int i = 0; i < 2; i++)
+                {
+                    float y = i * 18 - 14;
+                    Line(symbol, new Vector2(-17, y), new Vector2(0, y + 13), 4, accent);
+                    Line(symbol, new Vector2(0, y + 13), new Vector2(17, y), 4, accent);
+                }
+            }
+            face.raycastTarget = true;
+            return face.gameObject.AddComponent<HoldActionButton>();
+        }
+
+        public void SetCharge(PlayerKicker.KickType type, float charge, float curve = 0f)
+        {
+            bool shooting = type == PlayerKicker.KickType.Shot;
+            bool charging = type != PlayerKicker.KickType.None;
+            if (!charging && !chargeFill.transform.parent.gameObject.activeSelf) return;
+            chargeFill.transform.parent.gameObject.SetActive(charging);
+            charge = Mathf.Clamp01(charge);
+            chargeFill.fillAmount = charge;
+            chargeFill.color = shooting ? Gold : Mint;
+            passCharge.fillAmount = type == PlayerKicker.KickType.Pass ? charge : 0;
+            shotCharge.fillAmount = shooting ? charge : 0;
+            if (shooting && Mathf.Abs(curve) > 0.1f)
+                chargeLabel.text = $"SHOT {Mathf.RoundToInt(charge * 100):00}%  /  BEND {(curve > 0 ? "LEFT" : "RIGHT")}";
+            else chargeLabel.text = charge >= 1 ? "FULL POWER  /  RELEASE" : $"{(shooting ? "SHOT" : "PASS")}  /  {Mathf.RoundToInt(charge * 100):00}%";
+        }
+
         private void BuildBanner()
         {
-            Image panel = MakePanel(transform, "Banner", BannerColor);
+            Image panel = Panel(safeAreaRoot, "Banner", Ink, new Vector2(0, 26), new Vector2(660, 164));
             banner = panel.rectTransform;
-            banner.anchorMin = new Vector2(0.5f, 0.5f);
-            banner.anchorMax = new Vector2(0.5f, 0.5f);
-            banner.pivot = new Vector2(0.5f, 0.5f);
-            banner.anchoredPosition = new Vector2(0f, 40f);
-            banner.sizeDelta = new Vector2(1200f, 260f);
-
-            messageText = MakeText(banner, "Message", 110, Vector2.zero, Vector2.one);
-            Outline outline = messageText.gameObject.AddComponent<Outline>();
-            outline.effectColor = new Color(0f, 0f, 0f, 0.6f);
-            outline.effectDistance = new Vector2(3f, -3f);
-
+            bannerGroup = panel.gameObject.AddComponent<CanvasGroup>();
+            bannerGroup.blocksRaycasts = false;
+            bannerGroup.interactable = false;
+            messageEyebrow = Label(banner, "Eyebrow", "P O I N T P A S S", 17, new Vector2(0, 48), new Vector2(500, 30), Mint).rectTransform;
+            messageAccent = Bar(banner, "Accent", new Vector2(0, -56), new Vector2(38, 3), Mint).rectTransform;
+            messageText = Label(banner, "Message", "", 54, new Vector2(0, 0), new Vector2(610, 76), Paper, true);
+            messageDetail = Label(banner, "Detail", "", 27, new Vector2(0, -79), new Vector2(610, 96), Muted);
             banner.gameObject.SetActive(false);
         }
 
-        // ---- Small helpers ----
-        private Image MakePanel(Transform parent, string objectName, Color color)
+        private static void EnsureEventSystem()
         {
-            Image image = MakeImage(parent, objectName, panelSprite, color);
-            image.type = Image.Type.Sliced;
-            image.raycastTarget = false;
+            EventSystem system = FindFirstObjectByType<EventSystem>();
+            if (system == null) system = new GameObject("EventSystem").AddComponent<EventSystem>();
+            StandaloneInputModule old = system.GetComponent<StandaloneInputModule>();
+            if (old != null) { old.enabled = false; Destroy(old); }
+            if (system.GetComponent<InputSystemUIInputModule>() == null)
+                system.gameObject.AddComponent<InputSystemUIInputModule>().AssignDefaultActions();
+        }
+
+        private Image Panel(Transform parent, string name, Color color, Vector2 position, Vector2 size)
+        {
+            Image image = Image(parent, name, panelSprite, color);
+            image.type = UnityEngine.UI.Image.Type.Sliced;
+            Place(image.rectTransform, Vector2.one * 0.5f, position, size);
             return image;
         }
 
-        private static RectTransform MakeRect(Transform parent, string objectName)
+        private static Image Circle(Transform parent, string name, Color color, Vector2 position, float diameter)
         {
-            GameObject go = new GameObject(objectName, typeof(RectTransform));
+            Image image = Image(parent, name, SpriteLibrary.WhiteCircle(), color);
+            Place(image.rectTransform, Vector2.one * 0.5f, position, Vector2.one * diameter);
+            return image;
+        }
+
+        private static Image Bar(Transform parent, string name, Vector2 position, Vector2 size, Color color)
+        {
+            Image image = Image(parent, name, SpriteLibrary.WhiteSquare(), color);
+            Place(image.rectTransform, Vector2.one * 0.5f, position, size);
+            return image;
+        }
+
+        private static void Line(Transform parent, Vector2 from, Vector2 to, float width, Color color)
+        {
+            Image line = Bar(parent, "Stroke", (from + to) * 0.5f, new Vector2(Vector2.Distance(from, to), width), color);
+            line.rectTransform.localRotation = Quaternion.Euler(0, 0, Mathf.Atan2(to.y - from.y, to.x - from.x) * Mathf.Rad2Deg);
+        }
+
+        private static RectTransform Rect(Transform parent, string name)
+        {
+            GameObject go = new GameObject(name, typeof(RectTransform));
             go.transform.SetParent(parent, false);
             return go.GetComponent<RectTransform>();
         }
 
-        private static void Stretch(RectTransform rect)
+        private static void Place(RectTransform rect, Vector2 anchor, Vector2 position, Vector2 size, Vector2? pivot = null)
         {
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
+            rect.anchorMin = rect.anchorMax = anchor;
+            rect.pivot = pivot ?? Vector2.one * 0.5f;
+            rect.anchoredPosition = position;
+            rect.sizeDelta = size;
         }
 
-        private static Image MakeImage(Transform parent, string objectName, Sprite sprite, Color color)
+        private static void Stretch(RectTransform rect)
         {
-            GameObject go = new GameObject(objectName, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
-            go.transform.SetParent(parent, false);
-            Image image = go.GetComponent<Image>();
-            image.sprite = sprite;
-            image.color = color;
+            rect.anchorMin = Vector2.zero; rect.anchorMax = Vector2.one;
+            rect.offsetMin = rect.offsetMax = Vector2.zero;
+        }
+
+        private static Image Image(Transform parent, string name, Sprite sprite, Color color)
+        {
+            Image image = Rect(parent, name).gameObject.AddComponent<Image>();
+            image.sprite = sprite; image.color = color; image.raycastTarget = false;
             return image;
         }
 
-        private static Text MakeText(Transform parent, string objectName, int size, Vector2 anchorMin, Vector2 anchorMax)
+        private static Text Label(Transform parent, string name, string content, int size, Vector2 position, Vector2 bounds, Color color, bool bold = false)
         {
-            GameObject go = new GameObject(objectName, typeof(RectTransform), typeof(CanvasRenderer), typeof(Text));
-            go.transform.SetParent(parent, false);
-
-            Text text = go.GetComponent<Text>();
+            Text text = Rect(parent, name).gameObject.AddComponent<Text>();
             text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            text.fontSize = size;
-            text.fontStyle = FontStyle.Bold;
-            text.alignment = TextAnchor.MiddleCenter;
-            text.color = Color.white;
-            text.supportRichText = true;
-            text.raycastTarget = false;
-            text.horizontalOverflow = HorizontalWrapMode.Overflow;
-            text.verticalOverflow = VerticalWrapMode.Overflow;
-
-            RectTransform rect = text.rectTransform;
-            rect.anchorMin = anchorMin;
-            rect.anchorMax = anchorMax;
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
+            text.fontSize = size; text.fontStyle = bold ? FontStyle.Bold : FontStyle.Normal;
+            text.alignment = TextAnchor.MiddleCenter; text.color = color;
+            text.supportRichText = true; text.raycastTarget = false;
+            text.horizontalOverflow = HorizontalWrapMode.Wrap;
+            text.verticalOverflow = VerticalWrapMode.Truncate;
+            text.text = content;
+            Place(text.rectTransform, Vector2.one * 0.5f, position, bounds);
             return text;
+        }
+
+        // Generated once at runtime. No imported artwork or per-frame texture allocations.
+        private static Sprite RoundedPanel()
+        {
+            if (roundedSprite != null) return roundedSprite;
+            const int size = 64;
+            const float cornerRadius = 16;
+            Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            texture.name = "HUD Panel";
+            texture.wrapMode = TextureWrapMode.Clamp;
+            Color[] pixels = new Color[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    Vector2 offset = new Vector2(Mathf.Abs(x + 0.5f - size * 0.5f), Mathf.Abs(y + 0.5f - size * 0.5f));
+                    Vector2 edge = offset - Vector2.one * (size * 0.5f - cornerRadius - 1);
+                    float distance = new Vector2(Mathf.Max(edge.x, 0), Mathf.Max(edge.y, 0)).magnitude
+                        + Mathf.Min(Mathf.Max(edge.x, edge.y), 0) - cornerRadius;
+                    pixels[y * size + x] = new Color(1, 1, 1, Mathf.Clamp01(0.5f - distance));
+                }
+            texture.SetPixels(pixels); texture.Apply();
+            roundedSprite = Sprite.Create(texture, new Rect(0, 0, size, size), Vector2.one * 0.5f,
+                100, 0, SpriteMeshType.FullRect, Vector4.one * 18);
+            return roundedSprite;
+        }
+
+        private static Sprite Ring()
+        {
+            if (ringSprite != null) return ringSprite;
+            const int size = 128;
+            Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            texture.name = "HUD Ring";
+            texture.wrapMode = TextureWrapMode.Clamp;
+            Color[] pixels = new Color[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float radius = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), Vector2.one * 64);
+                    float alpha = Mathf.Clamp01(63 - radius) * Mathf.Clamp01(radius - 59);
+                    pixels[y * size + x] = new Color(1, 1, 1, alpha);
+                }
+            texture.SetPixels(pixels); texture.Apply();
+            ringSprite = Sprite.Create(texture, new Rect(0, 0, size, size), Vector2.one * 0.5f, 100);
+            return ringSprite;
         }
     }
 }

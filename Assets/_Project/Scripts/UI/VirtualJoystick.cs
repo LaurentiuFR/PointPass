@@ -11,6 +11,7 @@ namespace PointPass.UI
         private RectTransform background;
         private RectTransform handle;
         private float deadzone = 0.1f;
+        private int? pointerId;
 
         public Vector2 Value { get; private set; }
 
@@ -23,19 +24,33 @@ namespace PointPass.UI
 
         public void OnPointerDown(PointerEventData eventData)
         {
+            if (pointerId.HasValue) return;
+            pointerId = eventData.pointerId;
             UpdateStick(eventData);
         }
 
         public void OnDrag(PointerEventData eventData)
         {
+            if (pointerId != eventData.pointerId) return;
             UpdateStick(eventData);
         }
 
         public void OnPointerUp(PointerEventData eventData)
         {
+            if (pointerId != eventData.pointerId) return;
+            ResetInput();
+        }
+
+        public void ResetInput()
+        {
+            pointerId = null;
             Value = Vector2.zero;
             if (handle != null) handle.anchoredPosition = Vector2.zero;
         }
+
+        private void OnDisable() => ResetInput();
+        private void OnApplicationFocus(bool focused) { if (!focused) ResetInput(); }
+        private void OnApplicationPause(bool paused) { if (paused) ResetInput(); }
 
         private void UpdateStick(PointerEventData eventData)
         {

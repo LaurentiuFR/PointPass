@@ -16,8 +16,8 @@ namespace PointPass.Gameplay
 
         private void LateUpdate()
         {
-            float halfWidth = MatchConfig.PitchWidth * 0.5f + MatchConfig.GoalDepth + 0.6f;
-            float halfHeight = MatchConfig.PitchHeight * 0.5f + 0.8f;
+            float halfWidth = MatchConfig.PitchWidth * 0.5f + MatchConfig.GoalDepth + StadiumBuilder.HorizontalViewPadding;
+            float halfHeight = MatchConfig.PitchHeight * 0.5f + StadiumBuilder.VerticalViewPadding;
             cam.orthographicSize = Mathf.Max(halfHeight, halfWidth / cam.aspect);
         }
     }
