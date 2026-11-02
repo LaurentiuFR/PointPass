@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using PointPass.Core;
 using PointPass.Players;
 using PointPass.UI;
@@ -9,14 +10,15 @@ namespace PointPass.Gameplay
 {
     /// <summary>
     /// Runs the match: two 90s halves, goals, a 60s golden-goal overtime if tied, then full time.
+    /// It controls every player in the roster, so pauses and resets apply to all of them.
     /// </summary>
     public class MatchManager : MonoBehaviour
     {
         private enum Phase { Paused, Playing, FullTime }
 
         private Ball ball;
-        private PlayerMovement player;
-        private Dribbler dribbler;
+        private PossessionSystem possession;
+        private List<PlayerController> players;
         private MatchHud hud;
 
         private Phase phase = Phase.Paused;
@@ -27,11 +29,11 @@ namespace PointPass.Gameplay
         private float clock;
         private float fullTimeAt;
 
-        public void Init(Ball ball, PlayerMovement player, Dribbler dribbler, MatchHud hud)
+        public void Init(Ball ball, PossessionSystem possession, List<PlayerController> players, MatchHud hud)
         {
             this.ball = ball;
-            this.player = player;
-            this.dribbler = dribbler;
+            this.possession = possession;
+            this.players = players;
             this.hud = hud;
         }
 
@@ -158,18 +160,25 @@ namespace PointPass.Gameplay
             hud.ShowMessage("FULL TIME\n" + MatchHud.ScoreLine(blueScore, redScore) + "\nTap to play again");
         }
 
+        // Every player returns to his kick-off spot and the ball becomes free.
         private void ResetPositions()
         {
-            dribbler.Release();
+            possession.Clear();
             ball.ResetTo(Vector2.zero);
-            player.ResetTo(new Vector2(-3f, 0f), -90f);
+            foreach (PlayerController player in players)
+            {
+                player.ResetToKickoff();
+            }
         }
 
+        // Freezes or unfreezes the ball and the whole roster together.
         private void SetPlaying(bool playing)
         {
             ball.Body.simulated = playing;
-            player.Body.simulated = playing;
-            player.InputEnabled = playing;
+            foreach (PlayerController player in players)
+            {
+                player.SetActive(playing);
+            }
         }
 
         private void UpdateClock()

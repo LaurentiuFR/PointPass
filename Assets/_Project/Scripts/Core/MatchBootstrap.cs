@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using PointPass.Gameplay;
 using PointPass.Players;
 using PointPass.UI;
@@ -28,11 +29,16 @@ namespace PointPass.Core
 
             PitchBuilder.Build(root, manager.OnGoal);
             Ball ball = CreateBall(root);
-            PlayerMovement player = CreatePlayer(root, Team.Blue, ball);
-            MatchHud hud = MatchHud.Create();
+            PossessionSystem possession = new PossessionSystem();
 
-            player.Bind(hud.Joystick);
-            manager.Init(ball, player, player.GetComponent<Dribbler>(), hud);
+            // The roster: every player in the match. For now, one human-controlled blue player.
+            PlayerController human = CreatePlayer(root, Team.Blue, ball, possession, new Vector2(-3f, 0f), -90f);
+            List<PlayerController> roster = new List<PlayerController> { human };
+
+            MatchHud hud = MatchHud.Create();
+            human.gameObject.AddComponent<HumanPlayerInput>().Init(hud.Joystick);
+
+            manager.Init(ball, possession, roster, hud);
         }
 
         // Removes leftovers from hand-built scenes. Keeps cameras, lights and the EventSystem.
@@ -93,7 +99,8 @@ namespace PointPass.Core
             return ball;
         }
 
-        private static PlayerMovement CreatePlayer(Transform root, Team team, Ball ball)
+        private static PlayerController CreatePlayer(
+            Transform root, Team team, Ball ball, PossessionSystem possession, Vector2 kickoffPosition, float kickoffAngle)
         {
             GameObject go = new GameObject("Player");
             go.transform.SetParent(root, false);
@@ -109,7 +116,10 @@ namespace PointPass.Core
             CircleCollider2D collider = go.AddComponent<CircleCollider2D>();
             collider.radius = MatchConfig.PlayerColliderRadius;
 
-            PlayerMovement movement = go.AddComponent<PlayerMovement>();
+            go.AddComponent<PlayerMovement>();
+            PlayerController controller = go.AddComponent<PlayerController>();
+            controller.Init(team, kickoffPosition, kickoffAngle);
+            go.transform.position = kickoffPosition;
 
             Vector2 size = Vector2.one * MatchConfig.PlayerDiameter;
             Color teamColor = team == Team.Blue ? MatchConfig.BlueTeam : MatchConfig.RedTeam;
@@ -130,8 +140,8 @@ namespace PointPass.Core
             animator.Init(leftBoot.transform, rightBoot.transform, bodySprite.transform);
 
             Dribbler dribbler = go.AddComponent<Dribbler>();
-            dribbler.Init(ball, animator);
-            return movement;
+            dribbler.Init(ball, possession, animator);
+            return controller;
         }
     }
 }

@@ -4,12 +4,12 @@ using UnityEngine;
 namespace PointPass.Players
 {
     /// <summary>
-    /// Close control. When the ball is in front of the player's feet he picks it up: the ball
-    /// follows a point just ahead of his boots and is nudged forward and side to side in time
-    /// with his stride, like a real dribble. Stand still and it rests at his feet. A ball behind
-    /// him or struck hard is not picked up and just bounces off him.
+    /// Close control. When the ball is in front of the player's feet he asks the PossessionSystem
+    /// for it; if he gets it, the ball follows a point just ahead of his boots and is nudged in
+    /// time with his stride. Ownership lives in PossessionSystem, never here, and nothing in this
+    /// class depends on who is controlling the player.
     /// </summary>
-    [RequireComponent(typeof(PlayerMovement))]
+    [RequireComponent(typeof(PlayerController))]
     public class Dribbler : MonoBehaviour
     {
         [Header("Pick-up")]
@@ -27,51 +27,59 @@ namespace PointPass.Players
         [SerializeField] private float speedWhileDribbling = 0.92f;
 
         private Ball ball;
+        private PossessionSystem possession;
         private PlayerAnimator animator;
+        private PlayerController controller;
         private PlayerMovement movement;
         private Rigidbody2D body;
         private Collider2D ownCollider;
+        private bool carrying;          // local mirror of "possession says I own the ball"
         private float noPickupUntil;
 
-        public bool HasBall { get; private set; }
+        public bool HasBall => possession != null && possession.IsOwner(controller);
 
-        public void Init(Ball ball, PlayerAnimator animator)
+        public void Init(Ball ball, PossessionSystem possession, PlayerAnimator animator)
         {
             this.ball = ball;
+            this.possession = possession;
             this.animator = animator;
         }
 
         private void Awake()
         {
+            controller = GetComponent<PlayerController>();
+            movement = GetComponent<PlayerMovement>();
             body = GetComponent<Rigidbody2D>();
             ownCollider = GetComponent<Collider2D>();
-            movement = GetComponent<PlayerMovement>();
         }
 
         private void FixedUpdate()
         {
-            if (ball == null) return;
+            if (ball == null || possession == null) return;
 
-            if (!movement.InputEnabled)
+            // Match paused or frozen: let go of everything.
+            if (!controller.IsActive)
             {
-                if (HasBall) Release();
+                if (carrying) Release();
                 return;
             }
 
-            if (!HasBall) TryPickUp();
-            if (HasBall) Carry();
+            // Someone else (or a reset) took ownership away from us.
+            if (carrying && !possession.IsOwner(controller))
+            {
+                StopCarrying();
+                return;
+            }
+
+            if (!carrying) TryPickUp();
+            if (carrying) Carry();
         }
 
-        /// <summary>Lets go of the ball (used for kicks, tackles and resets).</summary>
+        /// <summary>Lets go of the ball (kicks, tackles, resets and pauses all end up here).</summary>
         public void Release()
         {
-            if (HasBall && ball != null && ownCollider != null)
-            {
-                Physics2D.IgnoreCollision(ownCollider, ball.Collider, false);
-            }
-            HasBall = false;
-            movement.SpeedMultiplier = 1f;
-            noPickupUntil = Time.time + pickupCooldown;
+            possession?.Release(controller);
+            StopCarrying();
         }
 
         private void TryPickUp()
@@ -85,7 +93,9 @@ namespace PointPass.Players
             if (toBall.sqrMagnitude > 0.0001f && Vector2.Dot(toBall.normalized, transform.up) < 0.1f) return; // must be in front
             if ((ball.Body.linearVelocity - body.linearVelocity).magnitude > maxPickupSpeed) return;
 
-            HasBall = true;
+            if (!possession.TryAcquire(controller)) return; // somebody else already has it
+
+            carrying = true;
             Physics2D.IgnoreCollision(ownCollider, ball.Collider, true);
             movement.SpeedMultiplier = speedWhileDribbling;
         }
@@ -101,6 +111,17 @@ namespace PointPass.Players
 
             Vector2 desired = body.linearVelocity + error * followGain;
             ball.Body.linearVelocity = Vector2.ClampMagnitude(desired, maxBallSpeed);
+        }
+
+        private void StopCarrying()
+        {
+            if (carrying)
+            {
+                Physics2D.IgnoreCollision(ownCollider, ball.Collider, false);
+                carrying = false;
+            }
+            movement.SpeedMultiplier = 1f;
+            noPickupUntil = Time.time + pickupCooldown;
         }
 
         // The spot the ball is steered toward, in world space.
