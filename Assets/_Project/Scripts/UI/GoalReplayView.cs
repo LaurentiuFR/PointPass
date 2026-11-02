@@ -16,44 +16,51 @@ namespace PointPass.UI
         private float playhead;
         private readonly Image[] speedImages = new Image[4];
         private readonly Text[] speedLabels = new Text[4];
-        private Text arrowLabel, phaseLabel;
+        private Text arrowLabel, phaseLabel, pauseLabel, elapsedLabel;
         private Image arrowImage;
         private bool showArrow;
         public float PlaybackTime => playhead;
         public float PlaybackSpeed { get; private set; } = 1f;
         public bool ShowShotArrow => showArrow;
+        public bool ReplayIsPaused { get; private set; }
+        public float PlaybackDuration => clip != null ? clip.Duration : 0;
         public GoalReplayWorld World => world;
 
         public void Build()
         {
-            viewport = Rect("ReplayViewport", transform, new Vector2(0, 35), new Vector2(1180, 550)).gameObject.AddComponent<RawImage>();
+            viewport = Rect("ReplayViewport", transform, new Vector2(0, 70), new Vector2(1180, 480)).gameObject.AddComponent<RawImage>();
             viewport.raycastTarget = false; viewport.color = Color.white;
             Label("ReplayLabel", transform, "GOAL HIGHLIGHT", 28, new Vector2(-370, 348), new Vector2(440, 50), MatchPalette.Paper);
             phaseLabel = Label("ReplayPhase", transform, "BUILD-UP", 20, new Vector2(420, 348), new Vector2(340, 45), MatchPalette.Accent);
-            Label("SpeedCaption", transform, "PLAYBACK", 17, new Vector2(-495, -273), new Vector2(170, 50), MatchPalette.Muted);
+            Label("SpeedCaption", transform, "PLAYBACK", 17, new Vector2(-495, -207), new Vector2(170, 50), MatchPalette.Muted);
             for (int i = 0; i < Speeds.Length; i++)
             {
                 int index = i;
-                Button button = Button("Speed" + i, new Vector2(-350 + i * 115, -273), new Vector2(106, 50),
+                Button button = Button("Speed" + i, new Vector2(-350 + i * 115, -207), new Vector2(106, 50),
                     Speeds[i].ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + "×", () => SetPlaybackSpeed(Speeds[index]));
                 speedImages[i] = button.GetComponent<Image>(); speedLabels[i] = button.GetComponentInChildren<Text>();
             }
-            Button arrow = Button("ShowShotArrow", new Vector2(355, -273), new Vector2(360, 50), "[ ] SHOW SHOT ARROW", () => SetShowShotArrow(!showArrow));
+            Button arrow = Button("ShowShotArrow", new Vector2(355, -207), new Vector2(360, 50), "[ ] SHOW SHOT ARROW", () => SetShowShotArrow(!showArrow));
             arrowLabel = arrow.GetComponentInChildren<Text>();
             arrowImage = arrow.GetComponent<Image>();
+            Button pause = Button("PauseReplay", new Vector2(-402, -273), new Vector2(230, 50), "PAUSE", () => SetPaused(!ReplayIsPaused));
+            pauseLabel = pause.GetComponentInChildren<Text>();
+            Button("RestartReplay", new Vector2(-147, -273), new Vector2(230, 50), "RESTART", Restart);
+            elapsedLabel = Label("ReplayElapsed", transform, "00:00.0 / 00:00.0", 22,
+                new Vector2(345, -273), new Vector2(380, 50), MatchPalette.Paper);
             RefreshControls();
         }
 
         public void Play(GoalReplayClip replay)
         {
             if (!GoalReplayRecorder.IsValid(replay)) return;
-            clip = replay; playhead = 0; PlaybackSpeed = 1; showArrow = false;
+            clip = replay; playhead = 0; PlaybackSpeed = 1; showArrow = false; ReplayIsPaused = false;
             ReleaseWorld();
             // Match the actual display density, capped at native 1080p for mobile cost.
             Canvas canvas = GetComponentInParent<Canvas>();
             float density = canvas != null ? Mathf.Max(1, canvas.scaleFactor) : 1;
             int width = Mathf.Clamp(Mathf.CeilToInt(1180 * density), 1180, 1920);
-            int height = Mathf.CeilToInt(width * 550f / 1180f);
+            int height = Mathf.CeilToInt(width * 480f / 1180f);
             texture = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32)
                 { name = "Goal replay native scene", antiAliasing = 4, filterMode = FilterMode.Bilinear, useMipMap = false };
             texture.Create(); viewport.texture = texture;
@@ -65,7 +72,7 @@ namespace PointPass.UI
         private void Update() => Advance(Time.unscaledDeltaTime);
         public void Advance(float seconds)
         {
-            if (clip == null || world == null || seconds < 0 || float.IsNaN(seconds) || float.IsInfinity(seconds)) return;
+            if (clip == null || world == null || ReplayIsPaused || seconds < 0 || float.IsNaN(seconds) || float.IsInfinity(seconds)) return;
             // Hold the final celebration frame briefly, then start the same continuous clip.
             playhead = Mathf.Repeat(playhead + seconds * PlaybackSpeed, clip.Duration + 0.8f);
             Present();
@@ -73,8 +80,11 @@ namespace PointPass.UI
         public void SetPlaybackSpeed(float speed)
         {
             foreach (float allowed in Speeds)
-                if (Mathf.Approximately(speed, allowed)) { PlaybackSpeed = allowed; RefreshControls(); return; }
+                if (Mathf.Approximately(speed, allowed)) { PlaybackSpeed = allowed; RefreshControls(); Present(); return; }
         }
+        public void SetPaused(bool paused) { ReplayIsPaused = paused; RefreshControls(); Present(); }
+        /// <summary>Return to the recorded opening frame without changing the viewer's preferences.</summary>
+        public void Restart() { playhead = 0; RefreshControls(); Present(); }
         public void SetShowShotArrow(bool visible) { showArrow = visible; RefreshControls(); Present(); }
         private void Present()
         {
@@ -83,6 +93,12 @@ namespace PointPass.UI
             world.Present(time, showArrow);
             if (phaseLabel != null) phaseLabel.text = time < clip.goalTime ? "BUILD-UP  /  " + PlaybackSpeed.ToString("0.#") + "×"
                 : "GOAL + CELEBRATION  /  " + PlaybackSpeed.ToString("0.#") + "×";
+            if (elapsedLabel != null) elapsedLabel.text = FormatTime(Mathf.Min(playhead, clip.Duration)) + " / " + FormatTime(clip.Duration);
+        }
+        private static string FormatTime(float seconds)
+        {
+            int tenths = Mathf.FloorToInt(Mathf.Max(0, seconds) * 10);
+            return $"{tenths / 600:00}:{tenths / 10 % 60:00}.{tenths % 10}";
         }
         private void RefreshControls()
         {
@@ -95,6 +111,7 @@ namespace PointPass.UI
             if (arrowLabel != null) arrowLabel.text = (showArrow ? "[✓] " : "[ ] ") + "SHOW SHOT ARROW";
             if (arrowImage != null) arrowImage.color = showArrow ? MatchPalette.Accent : MatchPalette.Surface;
             if (arrowLabel != null) arrowLabel.color = showArrow ? MatchPalette.Ink : MatchPalette.Paper;
+            if (pauseLabel != null) pauseLabel.text = ReplayIsPaused ? "RESUME" : "PAUSE";
         }
         private Button Button(string name, Vector2 position, Vector2 size, string text, UnityEngine.Events.UnityAction action)
         {

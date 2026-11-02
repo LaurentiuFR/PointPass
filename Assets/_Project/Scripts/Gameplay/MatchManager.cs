@@ -14,7 +14,7 @@ namespace PointPass.Gameplay
     /// </summary>
     public class MatchManager : MonoBehaviour
     {
-        private enum Phase { MainMenu, Paused, Playing, FullTime }
+        private enum Phase { MainMenu, Paused, Playing, FullTime, Practice }
 
         private Ball ball;
         private PossessionSystem possession;
@@ -37,9 +37,14 @@ namespace PointPass.Gameplay
         private GoalReplayRecorder replay;
         private Team lastScoringTeam;
         private bool wasOwnGoal;
+        private PassingPractice practice;
+        private PracticeHud practiceHud;
 
         public bool IsUserPaused => userPaused;
         public bool IsInMainMenu => phase == Phase.MainMenu;
+        public bool IsPracticing => practice != null && practice.IsRunning;
+        public event System.Action<Team> GoalScored;
+        public event System.Action MatchWhistle;
 
         public void Init(Ball ball, PossessionSystem possession, List<PlayerController> players, MatchHud hud)
         {
@@ -57,6 +62,13 @@ namespace PointPass.Gameplay
             replay.Init(ball,players);
             replay.ClipReady += OnReplayReady;
             hud.PauseRequested += PauseMatch;
+            practice = GetComponent<PassingPractice>();
+            if (practice == null) practice = gameObject.AddComponent<PassingPractice>();
+            if (players.Count > 0)
+            {
+                practice.Init(ball, possession, players[0]);
+                practiceHud = PracticeHud.Create(hud.transform.Find("SafeArea"), practice);
+            }
         }
 
         public void SetMenu(MatchMenu menu)
@@ -65,8 +77,9 @@ namespace PointPass.Gameplay
             this.menu = menu;
             if (menu == null) return;
             menu.PlayRequested += StartMatch;
+            menu.PracticeRequested += StartPractice;
             menu.ResumeRequested += ResumeMatch;
-            menu.RestartRequested += StartMatch;
+            menu.RestartRequested += RestartSession;
             menu.MainMenuRequested += OpenMainMenu;
             menu.SetReplay(replay?.Latest);
         }
@@ -75,8 +88,9 @@ namespace PointPass.Gameplay
         {
             if (menu == null) return;
             menu.PlayRequested -= StartMatch;
+            menu.PracticeRequested -= StartPractice;
             menu.ResumeRequested -= ResumeMatch;
-            menu.RestartRequested -= StartMatch;
+            menu.RestartRequested -= RestartSession;
             menu.MainMenuRequested -= OpenMainMenu;
         }
 
@@ -90,6 +104,7 @@ namespace PointPass.Gameplay
         {
             StopAllCoroutines();
             RestoreGameTime();
+            EndPractice();
             menu?.Hide();
             hud.gameObject.SetActive(true);
             SetPlayerInput(true);
@@ -104,6 +119,39 @@ namespace PointPass.Gameplay
             StartCoroutine(KickoffRoutine("KICK OFF"));
         }
 
+        public void StartPractice()
+        {
+            if (practice == null || players.Count == 0) return;
+            StopAllCoroutines();
+            RestoreGameTime();
+            SetPlaying(true);
+            ResetPositions();
+            replay?.SetRecording(false);
+            menu?.SetPracticeMode(true);
+            menu?.Hide();
+            hud.gameObject.SetActive(true);
+            hud.SetPracticeMode(true);
+            hud.ShowMessage(string.Empty);
+            phase = Phase.Practice;
+            SetPlayerInput(true);
+            practice.BeginSession();
+            practiceHud?.SetVisible(true);
+        }
+
+        private void RestartSession()
+        {
+            if (IsPracticing) StartPractice();
+            else StartMatch();
+        }
+
+        private void EndPractice()
+        {
+            practice?.EndSession();
+            practiceHud?.SetVisible(false);
+            hud?.SetPracticeMode(false);
+            menu?.SetPracticeMode(false);
+        }
+
         public void OnGoal(Team scoringTeam)
         {
             if (phase != Phase.Playing || userPaused) return;
@@ -112,6 +160,7 @@ namespace PointPass.Gameplay
             else redScore++;
 
             phase = Phase.Paused;
+            GoalScored?.Invoke(scoringTeam);
             hud.SetScore(blueScore, redScore);
             crowd?.Celebrate(scoringTeam);
             confetti?.Celebrate(scoringTeam);
@@ -144,6 +193,7 @@ namespace PointPass.Gameplay
                 {
                     clock = 0f;
                     phase = Phase.Paused;
+                    MatchWhistle?.Invoke();
                     UpdateClock();
                     StartCoroutine(PeriodEndRoutine());
                     return;
@@ -156,6 +206,7 @@ namespace PointPass.Gameplay
         {
             StopAllCoroutines();
             RestoreGameTime();
+            EndPractice();
             phase = Phase.MainMenu;
             SetPlayerInput(false);
             // Clear momentum while bodies are simulated, then freeze the abandoned match.
@@ -169,7 +220,7 @@ namespace PointPass.Gameplay
 
         public void PauseMatch()
         {
-            if (menu == null || userPaused || (phase != Phase.Playing && phase != Phase.Paused)) return;
+            if (menu == null || userPaused || (phase != Phase.Playing && phase != Phase.Paused && phase != Phase.Practice)) return;
             previousTimeScale = Time.timeScale;
             userPaused = true;
             Time.timeScale = 0f;
@@ -217,6 +268,7 @@ namespace PointPass.Gameplay
             hud.ShowMessage(string.Empty);
             SetPlaying(true);
             phase = Phase.Playing;
+            MatchWhistle?.Invoke();
         }
 
         private IEnumerator GoalRoutine()
@@ -338,6 +390,7 @@ namespace PointPass.Gameplay
         private void OnDisable()
         {
             RestoreGameTime();
+            practice?.EndSession();
             if (players != null) SetPlayerInput(false);
             if (ball != null && players != null) SetPlaying(false);
         }

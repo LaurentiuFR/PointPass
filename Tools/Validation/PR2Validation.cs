@@ -27,7 +27,7 @@ public static class PR2Validation
     public static void Run()
     {
         int exit = 0;
-        try { Kicks(); Movement(); Buttons(); Joystick(); PhysicalPass(); DribbleFeel(); InputRouting(); InputFeelValidation.Run(Check); TurningValidation.Run(Check); PresentationValidation.Run(Check); MenuValidation.Run(Check); FlowAnimationValidation.Run(Check); CurveValidation.Run(Check); FlickValidation.Run(Check); StadiumValidation.Run(Check); GoalPresentationValidation.Run(Check); MatchDayValidation.Run(Check); GoalMomentValidation.Run(Check); MenuSharpnessValidation.Run(Check); LightingValidation.Run(Check); ReplayValidation.Run(Check); }
+        try { Kicks(); Movement(); Buttons(); Joystick(); PhysicalPass(); DribbleFeel(); InputRouting(); InputFeelValidation.Run(Check); TurningValidation.Run(Check); PresentationValidation.Run(Check); MenuValidation.Run(Check); FlowAnimationValidation.Run(Check); CurveValidation.Run(Check); FlickValidation.Run(Check); StadiumValidation.Run(Check); GoalPresentationValidation.Run(Check); MatchDayValidation.Run(Check); GoalMomentValidation.Run(Check); MenuSharpnessValidation.Run(Check); LightingValidation.Run(Check); ReplayValidation.Run(Check); PracticeValidation.Run(Check); ReplayControlsValidation.Run(Check); MobileCancellationValidation.Run(Check); AudioFeedbackValidation.Run(Check); }
         catch (Exception ex) { results.Add(ex.ToString()); exit = 1; }
         File.WriteAllLines("../PR2Verification/engine-tests.txt", results);
         Debug.Log(string.Join("\n", results));
@@ -279,7 +279,8 @@ public static class PR2Validation
         bool decorativeHit=false;
         foreach(var graphic in hud.GetComponentsInChildren<UnityEngine.UI.Graphic>(true))
             if(graphic.raycastTarget && graphic.name!="PassButton" && graphic.name!="ShootButton"
-                && graphic.name!="SprintButton" && graphic.name!="JoystickBase" && graphic.name!="PauseButton") decorativeHit=true;
+                && graphic.name!="SprintButton" && graphic.name!="JoystickBase" && graphic.name!="PauseButton"
+                && graphic.name!="CancelCharge") decorativeHit=true;
         Check(!decorativeHit,"Decorative HUD graphics never intercept touch input");
         hud.ShowMessage("FULL TIME\n"+MatchHud.ScoreLine(2,1)+"\nTap to play again");
         var banner=hud.transform.Find("SafeArea/Banner");

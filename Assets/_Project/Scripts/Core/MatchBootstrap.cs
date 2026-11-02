@@ -40,6 +40,7 @@ namespace PointPass.Core
             human.gameObject.AddComponent<PlayerAimGuide>().Init(ball);
 
             manager.Init(ball, possession, roster, hud);
+            root.gameObject.AddComponent<PointPass.Audio.FootballAudio>().Init(ball, roster, manager, possession);
             manager.SetMenu(MatchMenu.Create());
         }
 

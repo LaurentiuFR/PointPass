@@ -40,6 +40,7 @@ namespace PointPass.Players
             hud.ShootButton.Released += OnShotUp;
             hud.ShootButton.Cancelled += OnShotCancelled;
             hud.ShootButton.FlickChanged += OnShotFlick;
+            hud.CancelChargeRequested += OnTouchCancelCharge;
         }
 
         private void Awake()
@@ -169,6 +170,13 @@ namespace PointPass.Players
             if (hud == null) return;
             hud.PassButton.Cancel();
             hud.ShootButton.Cancel();
+            hud.SetCharge(PlayerKicker.KickType.None, 0);
+        }
+
+        private void OnTouchCancelCharge()
+        {
+            if (!isActiveAndEnabled || !controller.IsActive || !focused || applicationPaused) return;
+            CancelCurrentKick();
         }
 
         private void BeginKick(PlayerKicker.KickType type, KickSource source)
@@ -278,6 +286,7 @@ namespace PointPass.Players
             hud.ShootButton.Released -= OnShotUp;
             hud.ShootButton.Cancelled -= OnShotCancelled;
             hud.ShootButton.FlickChanged -= OnShotFlick;
+            hud.CancelChargeRequested -= OnTouchCancelCharge;
         }
 
         private Vector2 ReadMove()

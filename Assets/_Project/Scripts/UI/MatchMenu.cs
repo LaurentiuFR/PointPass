@@ -12,7 +12,7 @@ namespace PointPass.UI
     /// <summary>Modal presentation for the offline prototype. MatchManager owns match state.</summary>
     public class MatchMenu : MonoBehaviour, ICancelHandler
     {
-        public enum Screen { Main, Pause, Results, Controls, Replay }
+        public enum Screen { Main, Pause, Results, Controls, Replay, Audio }
 
         private static Color Ink => MatchPalette.Ink;
         private static Color Surface => MatchPalette.Surface;
@@ -32,6 +32,9 @@ namespace PointPass.UI
         private Rect lastSafeArea;
         private Vector2Int lastSize;
         private Screen controlsOrigin;
+        private Screen audioOrigin;
+        private bool practiceMode;
+        private Text pauseDescription, pauseRestartLabel;
         private int lastActivationFrame = -1;
         private RectTransform heroMotion;
         private RectTransform menuBall;
@@ -45,6 +48,7 @@ namespace PointPass.UI
         private readonly List<Text> themeLabels = new List<Text>();
 
         public event Action PlayRequested;
+        public event Action PracticeRequested;
         public event Action ResumeRequested;
         public event Action RestartRequested;
         public event Action MainMenuRequested;
@@ -78,6 +82,7 @@ namespace PointPass.UI
             menu.BuildResults();
             menu.BuildControls();
             menu.BuildReplay();
+            menu.BuildAudio();
             InterfaceTheme.Refresh(menu.transform, new Color(0.718f, 0.957f, 0.2f), Mint);
             MatchPalette.AccentChanged += menu.OnAccentChanged;
             menu.ApplyLayout();
@@ -167,6 +172,7 @@ namespace PointPass.UI
         {
             if (!IsOpen) return false;
             if (CurrentScreen == Screen.Controls) { Show(controlsOrigin); return true; }
+            if (CurrentScreen == Screen.Audio) { Show(audioOrigin); return true; }
             if (CurrentScreen == Screen.Replay) { Show(replayOrigin); return true; }
             if (CurrentScreen == Screen.Pause) { ResumeRequested?.Invoke(); return true; }
             return false;
@@ -205,10 +211,12 @@ namespace PointPass.UI
                 new Vector2(-342, -20), new Vector2(580, 90), Muted, false, TextAnchor.MiddleLeft);
             Button play = ActionButton(page, "PlayOffline", "PLAY OFFLINE    >", new Vector2(-372, -151), new Vector2(520, 88), true,
                 () => PlayRequested?.Invoke());
-            ActionButton(page, "HowToPlay", "HOW TO PLAY", new Vector2(-372, -257), new Vector2(520, 78), false,
+            ActionButton(page, "PassingPractice", "PASSING PRACTICE", new Vector2(-372, -239), new Vector2(520, 68), false,
+                () => PracticeRequested?.Invoke());
+            ActionButton(page, "HowToPlay", "HOW TO PLAY", new Vector2(-372, -320), new Vector2(520, 68), false,
                 () => ShowControls(Screen.Main));
             firstButtons.Add(Screen.Main, play);
-            Label(page, "Mode", "OFFLINE PROTOTYPE  /  SINGLE PLAYER", 18, new Vector2(-342, -343), new Vector2(580, 32), Muted, false, TextAnchor.MiddleLeft);
+            Label(page, "Mode", "OFFLINE PROTOTYPE  /  SINGLE PLAYER", 16, new Vector2(-342, -386), new Vector2(580, 24), Muted, false, TextAnchor.MiddleLeft);
 
             Image card = Panel(page, "HeroCard", Surface, new Vector2(357, 30), new Vector2(550, 680));
             RectTransform graphic = Rect(card.transform,"TacticalPitch");
@@ -227,7 +235,9 @@ namespace PointPass.UI
             menuBall = PictureAt(card.transform, "Football", SpriteLibrary.Get("ball_polished"), Color.white, new Vector2(133, 151), new Vector2(125, 125)).rectTransform;
             Panel(card.transform,"HeroCaption",Surface,new Vector2(0,-237),new Vector2(500,147));
             Label(card.transform, "Rules", "TWO HALVES.\nONE GOLDEN CHANCE.", 30, new Vector2(0, -245), new Vector2(460, 90), Paper, true);
-            BuildThemeButton(page, new Vector2(357, -363), new Vector2(550, 48));
+            BuildThemeButton(page, new Vector2(258, -363), new Vector2(352, 48));
+            ActionButton(page, "AudioSettings", "SOUND", new Vector2(542, -363), new Vector2(180, 48), false,
+                () => ShowAudio(Screen.Main));
         }
 
         private void BuildPause()
@@ -236,13 +246,14 @@ namespace PointPass.UI
             Image card = Panel(page, "PauseCard", Surface, Vector2.zero, new Vector2(660, 730));
             Label(card.transform, "Eyebrow", "P O I N T P A S S", 19, new Vector2(0, 288), new Vector2(550, 40), Mint);
             Label(card.transform, "Title", "TAKE A BREATHER", 43, new Vector2(0, 206), new Vector2(580, 70), Paper, true);
-            Label(card.transform, "Description", "Your match is paused.", 25, new Vector2(0, 143), new Vector2(580, 45), Muted);
+            pauseDescription = Label(card.transform, "Description", "Your match is paused.", 25, new Vector2(0, 143), new Vector2(580, 45), Muted);
             Button resume = ActionButton(card.transform, "Resume", "BACK TO THE PITCH", new Vector2(0, 44), new Vector2(520, 84), true,
                 () => ResumeRequested?.Invoke());
             ActionButton(card.transform, "Controls", "HOW TO PLAY", new Vector2(0, -59), new Vector2(520, 76), false,
                 () => ShowControls(Screen.Pause));
-            ActionButton(card.transform, "Restart", "RESTART MATCH", new Vector2(0, -153), new Vector2(520, 76), false,
+            Button restart = ActionButton(card.transform, "Restart", "RESTART MATCH", new Vector2(0, -153), new Vector2(520, 76), false,
                 () => RestartRequested?.Invoke());
+            pauseRestartLabel = restart.GetComponentInChildren<Text>();
             ActionButton(card.transform, "MainMenu", "MAIN MENU", new Vector2(0, -247), new Vector2(520, 76), false,
                 () => MainMenuRequested?.Invoke());
             firstButtons.Add(Screen.Pause, resume);
@@ -271,7 +282,15 @@ namespace PointPass.UI
         public void SetReplay(GoalReplayClip clip)
         {
             latestReplay=clip;
-            pauseReplay.gameObject.SetActive(clip!=null); resultsReplay.gameObject.SetActive(clip!=null);
+            pauseReplay.gameObject.SetActive(clip!=null && !practiceMode); resultsReplay.gameObject.SetActive(clip!=null);
+        }
+
+        public void SetPracticeMode(bool enabled)
+        {
+            practiceMode = enabled;
+            if (pauseDescription != null) pauseDescription.text = enabled ? "Your practice is paused." : "Your match is paused.";
+            if (pauseRestartLabel != null) pauseRestartLabel.text = enabled ? "RESTART PRACTICE" : "RESTART MATCH";
+            if (pauseReplay != null) pauseReplay.gameObject.SetActive(latestReplay != null && !enabled);
         }
 
         private void ShowReplay(Screen origin)
@@ -298,13 +317,32 @@ namespace PointPass.UI
             BuildControlColumn(page, "Keyboard", -405, "KEYBOARD",
                 "<color=#B7F433>WASD / ARROWS</color>\nMove and aim\n\n<color=#B7F433>J / K</color>\nHold pass / shoot, release to kick\n\n<color=#B7F433>Q / E WHILE SHOOTING</color>\nBend left / right\n\n<color=#B7F433>SHIFT / ESC / P</color>\nSprint / cancel / pause");
             BuildControlColumn(page, "Touch", 0, "TOUCH",
-                "<color=#B7F433>LEFT JOYSTICK</color>\nMove and aim\n\n<color=#B7F433>PASS / SHOOT</color>\nHold to charge, release to kick\n\n<color=#B7F433>FLICK FROM SHOOT</color>\nFlick sideways as you release\nto bend toward that side\n\n<color=#B7F433>SPRINT / PAUSE</color>\nRun faster / take a break");
+                "<color=#B7F433>LEFT JOYSTICK</color>\nMove and aim\n\n<color=#B7F433>PASS / SHOOT</color>\nHold to charge, release to kick\n\n<color=#B7F433>FLICK / CANCEL</color>\nFlick from Shoot to bend\nTap Cancel to stop the charge\n\n<color=#B7F433>SPRINT / PAUSE</color>\nRun faster / take a break");
             BuildControlColumn(page, "Gamepad", 405, "GAMEPAD",
                 "<color=#B7F433>LEFT STICK</color>\nMove and aim\n\n<color=#B7F433>SOUTH / EAST</color>\nHold pass / shoot, release to kick\n\n<color=#B7F433>RIGHT STICK</color>\nBend a shot toward that side\n\n<color=#B7F433>RB / NORTH / START</color>\nSprint / cancel / pause");
-            Button back = ActionButton(page, "Back", "BACK", new Vector2(-330, -319), new Vector2(400, 72), false,
+            Button back = ActionButton(page, "Back", "BACK", new Vector2(-465, -319), new Vector2(260, 72), false,
                 () => Show(controlsOrigin));
-            BuildThemeButton(page, new Vector2(245, -319), new Vector2(600, 72));
+            ActionButton(page, "AudioSettings", "SOUND", new Vector2(-185, -319), new Vector2(260, 72), false,
+                () => ShowAudio(Screen.Controls));
+            BuildThemeButton(page, new Vector2(285, -319), new Vector2(640, 72));
             firstButtons.Add(Screen.Controls, back);
+        }
+
+        private void ShowAudio(Screen origin)
+        {
+            audioOrigin = origin;
+            Show(Screen.Audio);
+        }
+
+        private void BuildAudio()
+        {
+            RectTransform page = Page(Screen.Audio);
+            Panel(page, "AudioCard", Surface, Vector2.zero, new Vector2(1000, 800));
+            Label(page, "Title", "SOUND", 49, new Vector2(0, 290), new Vector2(850, 80), Paper, true);
+            page.gameObject.AddComponent<AudioSettingsView>().Build();
+            Button back = ActionButton(page, "AudioBack", "BACK", new Vector2(0, -319), new Vector2(400, 72), false,
+                () => Show(audioOrigin));
+            firstButtons.Add(Screen.Audio, back);
         }
 
         private void BuildThemeButton(Transform page, Vector2 position, Vector2 size)

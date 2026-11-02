@@ -38,6 +38,8 @@ namespace PointPass.UI
         private Image passCharge;
         private Image shotCharge;
         private Text chargeLabel;
+        private Text bendLabel;
+        private bool practiceMode;
         private RectTransform safeAreaRoot;
         private Rect lastSafeArea;
         private Vector2Int lastScreenSize;
@@ -59,7 +61,9 @@ namespace PointPass.UI
         public HoldActionButton PassButton { get; private set; }
         public HoldActionButton ShootButton { get; private set; }
         public HoldActionButton SprintButton { get; private set; }
+        public Button CancelChargeButton { get; private set; }
         public event Action PauseRequested;
+        public event Action CancelChargeRequested;
 
         public static string ScoreLine(int blue, int red) =>
             $"<color=#4085DB>BLUE</color>  {blue} - {red}  <color=#E0594A>RED</color>";
@@ -186,10 +190,20 @@ namespace PointPass.UI
 
         public void ShowGoalReplayCue(bool saved)
         {
+            if (practiceMode) return;
             replayCue.gameObject.SetActive(true);
             replayCue.GetComponentInChildren<Text>().text = saved ? "GOAL REPLAY SAVED  /  WATCH FROM PAUSE" : "REPLAY READY  /  WATCH FROM PAUSE";
         }
         public void ClearGoalReplayCue() { if (replayCue!=null) replayCue.gameObject.SetActive(false); }
+
+        /// <summary>Practice owns its own heading; the common movement and action controls remain available.</summary>
+        public void SetPracticeMode(bool enabled)
+        {
+            practiceMode = enabled;
+            if (scoreRoot != null) scoreRoot.gameObject.SetActive(!enabled);
+            if (phaseText != null) phaseText.transform.parent.gameObject.SetActive(!enabled);
+            if (enabled) ClearGoalReplayCue();
+        }
 
         private void BuildScoreboard()
         {
@@ -257,6 +271,19 @@ namespace PointPass.UI
             chargeFill.type = UnityEngine.UI.Image.Type.Filled;
             chargeFill.fillMethod = UnityEngine.UI.Image.FillMethod.Horizontal;
             chargeFill.fillOrigin = 0;
+            Image cancel = Panel(safeAreaRoot, "CancelCharge", Ink, Vector2.zero, new Vector2(132, 56));
+            Place(cancel.rectTransform, new Vector2(1, 0), new Vector2(-462, 444), new Vector2(132, 56));
+            cancel.raycastTarget = true;
+            CancelChargeButton = cancel.gameObject.AddComponent<Button>();
+            CancelChargeButton.targetGraphic = cancel;
+            CancelChargeButton.navigation = new Navigation { mode = Navigation.Mode.None };
+            Label(cancel.transform, "Label", "CANCEL", 20, Vector2.zero, new Vector2(124, 42), Paper, true);
+            CancelChargeButton.onClick.AddListener(() =>
+            {
+                if (isActiveAndEnabled && CancelChargeButton.gameObject.activeInHierarchy) CancelChargeRequested?.Invoke();
+            });
+            bendLabel = Label(ShootButton.transform, "BendStrength", "STRAIGHT", 17,
+                new Vector2(0, -72), new Vector2(146, 24), Mint, true);
             SetCharge(PlayerKicker.KickType.None, 0);
         }
 
@@ -279,6 +306,7 @@ namespace PointPass.UI
             kickAvailabilityTarget = !active ? 0.25f : hasBall ? 1f : 0.42f;
             sprintAvailabilityTarget = active ? 1f : 0.25f;
             controlHint.transform.parent.gameObject.SetActive(active);
+            if (!active) SetCharge(PlayerKicker.KickType.None, 0);
             if (!active) return;
 
             controlHint.color = hasBall ? Mint : Muted;
@@ -339,6 +367,15 @@ namespace PointPass.UI
         {
             bool shooting = type == PlayerKicker.KickType.Shot;
             bool charging = type != PlayerKicker.KickType.None;
+            if (CancelChargeButton != null) CancelChargeButton.gameObject.SetActive(charging);
+            if (bendLabel != null)
+            {
+                bendLabel.gameObject.SetActive(shooting);
+                float strength = float.IsNaN(curve) || float.IsInfinity(curve) ? 0 : Mathf.Clamp(curve, -1, 1);
+                bendLabel.text = Mathf.Abs(strength) < 0.1f ? "STRAIGHT"
+                    : $"{(strength > 0 ? "LEFT" : "RIGHT")} {Mathf.RoundToInt(Mathf.Abs(strength) * 100)}%";
+                bendLabel.color = Mint;
+            }
             if (!charging && !chargeFill.transform.parent.gameObject.activeSelf) return;
             chargeFill.transform.parent.gameObject.SetActive(charging);
             charge = Mathf.Clamp01(charge);
@@ -349,6 +386,11 @@ namespace PointPass.UI
             if (shooting && Mathf.Abs(curve) > 0.1f)
                 chargeLabel.text = $"SHOT {Mathf.RoundToInt(charge * 100):00}%  /  BEND {(curve > 0 ? "LEFT" : "RIGHT")}";
             else chargeLabel.text = charge >= 1 ? "FULL POWER  /  RELEASE" : $"{(shooting ? "SHOT" : "PASS")}  /  {Mathf.RoundToInt(charge * 100):00}%";
+        }
+
+        private void OnDisable()
+        {
+            if (chargeFill != null) SetCharge(PlayerKicker.KickType.None, 0);
         }
 
         private void BuildBanner()

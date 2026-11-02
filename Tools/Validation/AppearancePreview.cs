@@ -181,6 +181,10 @@ namespace PointPass.Validation
                 Capture(camera, menu.GetComponent<Canvas>(), 1920, 1080, "../AppearanceVerification/menu-controls.png");
                 Capture(camera, menu.GetComponent<Canvas>(), 1280, 720, "../AppearanceVerification/menu-controls-720p.png");
                 Capture(camera, menu.GetComponent<Canvas>(), 1440, 1080, "../AppearanceVerification/menu-controls-tablet.png");
+                Call(menu, "ShowAudio", MatchMenu.Screen.Controls);
+                Capture(camera, menu.GetComponent<Canvas>(), 1920, 1080, "../AppearanceVerification/menu-sound.png");
+                Capture(camera, menu.GetComponent<Canvas>(), 1280, 720, "../AppearanceVerification/menu-sound-720p.png");
+                Capture(camera, menu.GetComponent<Canvas>(), 1440, 1080, "../AppearanceVerification/menu-sound-tablet.png");
                 menu.ShowPause();
                 Capture(camera, menu.GetComponent<Canvas>(), 1920, 1080, "../AppearanceVerification/menu-pause.png");
                 menu.ShowResults(2, 1);
