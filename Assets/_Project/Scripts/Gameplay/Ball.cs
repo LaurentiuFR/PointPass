@@ -16,6 +16,8 @@ namespace PointPass.Gameplay
         private float rollDirection = 1f;
         private float curveStrength;
         private float curveRemaining;
+        private bool settlingInNet;
+        private float fieldDamping;
 
         public Rigidbody2D Body { get; private set; }
         public Collider2D Collider { get; private set; }
@@ -103,10 +105,18 @@ namespace PointPass.Gameplay
             curveRemaining = nextRemaining;
         }
 
-        private void OnCollisionEnter2D(Collision2D collision) => SetCurve(0f);
+        private void OnCollisionEnter2D(Collision2D collision)
+        {
+            SetCurve(0f);
+            if (collision == null || collision.collider == null) return;
+            GoalNet net = collision.collider.GetComponentInParent<GoalNet>();
+            if (net != null) net.Absorb(this, collision);
+        }
 
         public void ResetTo(Vector2 position)
         {
+            if (settlingInNet) Body.linearDamping = fieldDamping;
+            settlingInNet = false;
             SetCurve(0f);
             if (speedTrail != null) speedTrail.emitting = false;
             Body.linearVelocity = Vector2.zero;
@@ -117,6 +127,13 @@ namespace PointPass.Gameplay
             // Moving a TrailRenderer can create a final endpoint even after emission stops.
             // Clear after the teleport so no old-to-new streak survives a kickoff reset.
             ClearTrail();
+        }
+
+        public void SettleInNet()
+        {
+            if (!settlingInNet) fieldDamping = Body.linearDamping;
+            settlingInNet = true;
+            Body.linearDamping = 5f;
         }
 
         private void ClearTrail()

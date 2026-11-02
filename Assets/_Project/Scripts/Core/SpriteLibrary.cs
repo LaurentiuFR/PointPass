@@ -12,6 +12,7 @@ namespace PointPass.Core
         private static readonly Dictionary<string, Sprite> cache = new Dictionary<string, Sprite>();
         private static Sprite whiteSquare;
         private static Sprite whiteCircle;
+        private static Sprite softDisc;
 
         public static Sprite Get(string spriteName, bool circleFallback = false)
         {
@@ -45,6 +46,20 @@ namespace PointPass.Core
         public static bool IsPlaceholder(Sprite sprite)
         {
             return sprite == whiteSquare || sprite == whiteCircle;
+        }
+
+        /// <summary>Reuses the original pixels for a jointed limb without another bitmap.</summary>
+        public static Sprite GetRegion(string spriteName, Rect normalizedRect)
+        {
+            string key = spriteName + normalizedRect;
+            if (cache.TryGetValue(key, out Sprite cached) && cached != null) return cached;
+            Sprite source = Get(spriteName);
+            Rect rect = source.rect;
+            Sprite result = Sprite.Create(source.texture, new Rect(rect.x + rect.width * normalizedRect.x,
+                rect.y + rect.height * normalizedRect.y, rect.width * normalizedRect.width,
+                rect.height * normalizedRect.height), new Vector2(0.5f, 0.5f), source.pixelsPerUnit);
+            cache[key] = result;
+            return result;
         }
 
         /// <summary>Creates a child object with a SpriteRenderer scaled to worldSize (in world units).</summary>
@@ -115,6 +130,26 @@ namespace PointPass.Core
             tex.Apply();
             whiteCircle = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
             return whiteCircle;
+        }
+
+        public static Sprite SoftDisc()
+        {
+            if (softDisc != null) return softDisc;
+            const int size = 64;
+            Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            texture.filterMode = FilterMode.Bilinear;
+            texture.wrapMode = TextureWrapMode.Clamp;
+            Color[] pixels = new Color[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float radius = new Vector2((x + 0.5f) / size * 2 - 1, (y + 0.5f) / size * 2 - 1).magnitude;
+                    float alpha = Mathf.Clamp01(1 - radius);
+                    pixels[y * size + x] = new Color(1, 1, 1, alpha * alpha);
+                }
+            texture.SetPixels(pixels); texture.Apply();
+            softDisc = Sprite.Create(texture, new Rect(0, 0, size, size), Vector2.one * 0.5f, size);
+            return softDisc;
         }
     }
 }

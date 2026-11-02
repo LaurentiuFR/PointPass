@@ -109,6 +109,9 @@ namespace PointPass.Validation
                 rightArm.localPosition = new Vector3(0.33f, -0.04f, 0);
                 Vector3 leftRest = leftArm.localPosition;
                 Vector3 rightRest = rightArm.localPosition;
+                Transform leftElbow = new GameObject("Elbow").transform;
+                Transform rightElbow = new GameObject("Elbow").transform;
+                leftElbow.SetParent(leftArm, false); rightElbow.SetParent(rightArm, false);
                 animator.Init(leftBoot, rightBoot, torso, leftArm, rightArm);
                 typeof(PlayerAnimator).GetProperty("Phase").SetValue(animator, Mathf.PI * 0.5f);
                 typeof(PlayerAnimator).GetProperty("Intensity").SetValue(animator, 1f);
@@ -126,11 +129,28 @@ namespace PointPass.Validation
                     "Running arms rotate around their shoulder pivots");
                 check(body.position == position && body.linearVelocity == Vector2.up * 4.8f,
                     "Arm animation never changes physical movement");
+                check(Quaternion.Angle(leftElbow.localRotation, Quaternion.identity) > 10
+                    && Quaternion.Angle(rightElbow.localRotation, Quaternion.identity) > 10
+                    && Quaternion.Angle(leftElbow.localRotation, rightElbow.localRotation) > 20,
+                    "Elbows bend independently with mirrored running poses");
+                check(Mathf.DeltaAngle(0,leftElbow.localEulerAngles.z)>0
+                    && Mathf.DeltaAngle(0,rightElbow.localEulerAngles.z)<0,
+                    "Running elbows tuck both hands inward toward the torso");
+                check(Mathf.Abs(leftTravel)>Mathf.Abs(leftArm.localPosition.x-leftRest.x)*3
+                    && Quaternion.Angle(leftArm.localRotation,Quaternion.identity)<12,
+                    "Running arm swing travels mainly forward/back instead of flaring sideways");
+                go.transform.rotation=Quaternion.Euler(0,0,-90);
+                Vector3 swingWorld=go.transform.TransformVector(leftArm.localPosition-leftRest);
+                check(Mathf.Abs(Vector3.Dot(swingWorld.normalized,go.transform.up))>0.95f,
+                    "Arm travel follows the athlete's facing when the player turns");
                 body.simulated = false;
                 Call(animator, "Update");
                 check(leftArm.localPosition == leftRest && rightArm.localPosition == rightRest
                     && leftArm.localRotation == Quaternion.identity && rightArm.localRotation == Quaternion.identity,
                     "Freezing restores arm positions and rotations");
+                check(leftElbow.localRotation == Quaternion.identity && rightElbow.localRotation == Quaternion.identity
+                    && leftElbow.localScale == Vector3.one && rightElbow.localScale == Vector3.one,
+                    "Frozen players clear elbow bends and perspective offsets");
                 body.simulated = true;
                 animator.PlayKick(PlayerKicker.KickType.Shot);
                 Call(animator, "Update");

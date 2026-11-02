@@ -35,6 +35,8 @@ namespace PointPass.Players
         private Vector3 rightArmRest;
         private Quaternion leftArmRotation;
         private Quaternion rightArmRotation;
+        private Transform leftElbow;
+        private Transform rightElbow;
         private Vector2 lean;
         private float kickRemaining;
         private float kickStrength;
@@ -54,6 +56,8 @@ namespace PointPass.Players
             this.bodyVisual = bodyVisual;
             this.leftArm = leftArm;
             this.rightArm = rightArm;
+            leftElbow = leftArm != null ? leftArm.Find("Elbow") : null;
+            rightElbow = rightArm != null ? rightArm.Find("Elbow") : null;
             if (leftBoot != null)
             {
                 leftBase = leftBoot.localScale;
@@ -133,23 +137,27 @@ namespace PointPass.Players
 
             Vector2 localVelocity = Quaternion.Inverse(Quaternion.Euler(0, 0, body.rotation)) * body.linearVelocity;
             lean = Vector2.Lerp(lean, Vector2.ClampMagnitude(localVelocity / 6.48f, 1f), 1f - Mathf.Exp(-14f * Time.deltaTime));
-            // Arms counter-swing against the legs. A little more travel at sprint speed
-            // makes the run readable without moving the player's physics or hitbox.
+            // Project the shoulder swing along local forward/back, not out to the sides.
+            // These children inherit facing, so the same gait works in every direction.
             float armStrength = Mathf.Lerp(1f, 1.25f, Mathf.Clamp01((speed - referenceSpeed) / 1.68f));
             if (leftArm != null)
             {
                 leftArm.localPosition = leftArmRest + new Vector3(lean.x * 0.012f,
-                    -step * 0.065f * armStrength - leftStrike * 0.045f, 0);
+                    -step * 0.085f * armStrength - leftStrike * 0.025f, 0);
                 leftArm.localRotation = leftArmRotation * Quaternion.Euler(0, 0,
-                    step * 19f * armStrength + lean.x * 5f - leftStrike * 12f);
+                    step * 6f * armStrength + lean.x * 3f - leftStrike * 7f - kick * 5f);
             }
             if (rightArm != null)
             {
                 rightArm.localPosition = rightArmRest + new Vector3(lean.x * 0.012f,
-                    step * 0.065f * armStrength - rightStrike * 0.045f, 0);
+                    step * 0.085f * armStrength - rightStrike * 0.025f, 0);
                 rightArm.localRotation = rightArmRotation * Quaternion.Euler(0, 0,
-                    -step * 19f * armStrength + lean.x * 5f + rightStrike * 12f);
+                    -step * 6f * armStrength + lean.x * 3f + rightStrike * 7f + kick * 5f);
             }
+            // Hands follow a bent elbow rather than rotating the whole arm like a paddle.
+            // The forward arm folds more, and a shot opens both arms for balance.
+            PoseElbow(leftElbow, -1, -step, armStrength, kick);
+            PoseElbow(rightElbow, 1, step, armStrength, kick);
             if (bodyVisual != null)
             {
                 float bounce = 0.014f * Intensity * Mathf.Cos(2f * Phase);
@@ -170,6 +178,16 @@ namespace PointPass.Players
             if (bodyVisual != null) { bodyVisual.localPosition = bodyRest; bodyVisual.localScale = bodyBase; bodyVisual.localRotation = bodyRotation; }
             if (leftArm != null) { leftArm.localPosition = leftArmRest; leftArm.localRotation = leftArmRotation; }
             if (rightArm != null) { rightArm.localPosition = rightArmRest; rightArm.localRotation = rightArmRotation; }
+            if (leftElbow != null) { leftElbow.localRotation = Quaternion.identity; leftElbow.localScale = Vector3.one; }
+            if (rightElbow != null) { rightElbow.localRotation = Quaternion.identity; rightElbow.localScale = Vector3.one; }
+        }
+
+        private void PoseElbow(Transform elbow, float side, float swing, float strength, float kick)
+        {
+            if (elbow == null) return;
+            float bend = (15f + 2f * strength + 5f * swing) * Intensity + kick * 8f;
+            elbow.localRotation = Quaternion.Euler(0, 0, -side * bend);
+            elbow.localScale = new Vector3(1, 1f - 0.1f * Mathf.Max(0, swing), 1);
         }
 
         private void OnDisable() => ResetPose();

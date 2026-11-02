@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace PointPass.Gameplay
 {
-    /// <summary>Static stadium dressing and accurate field markings, batched into two meshes.</summary>
+    /// <summary>Static stadium dressing and markings, plus one batched animated crowd.</summary>
     public class StadiumBuilder : MonoBehaviour
     {
         public const float HorizontalViewPadding = 1.4f;
@@ -29,6 +29,17 @@ namespace PointPass.Gameplay
             builder.Commit("StadiumSurrounds", -25);
             builder.BuildMarkings();
             builder.Commit("PitchMarkings", -8);
+            root.AddComponent<StadiumCrowd>().Build(builder.material);
+            Transform fixtures = new GameObject("StadiumFixtures").transform;
+            fixtures.SetParent(root.transform, false);
+            fixtures.gameObject.AddComponent<StadiumFixtures>().Build(builder.material);
+            Transform referee = new GameObject("SidelineReferee").transform;
+            referee.SetParent(root.transform, false);
+            referee.localPosition = new Vector2(0.65f, -6.03f);
+            referee.gameObject.AddComponent<SidelineReferee>().Build(builder.material);
+            Transform confetti = new GameObject("GoalConfetti").transform;
+            confetti.SetParent(root.transform, false);
+            confetti.gameObject.AddComponent<GoalConfetti>().Build(builder.material);
         }
 
         private void BuildSurrounds()
@@ -54,7 +65,7 @@ namespace PointPass.Gameplay
                 Quad(new Vector2(sign * 11.93f, 0), new Vector2(1.22f, 12.45f), deck);
             }
 
-            // Hundreds of static seats and spectators share one mesh and material, not GameObjects.
+            // Seats stay static; the crowd above them uses one separate animated mesh.
             for (int row = 0; row < 3; row++)
             {
                 float y = 6.6f + row * 0.28f;
@@ -93,28 +104,12 @@ namespace PointPass.Gameplay
                 }
             }
 
-            // Compact floodlight structures and their shallow cast shadows sit outside the walls.
-            foreach (float x in new[] { -10.73f, 10.73f })
-                foreach (float y in new[] { -6.55f, 6.55f })
-                {
-                    Quad(new Vector2(x + 0.18f, y - 0.2f), new Vector2(0.66f, 0.24f), new Color(0, 0, 0, 0.22f));
-                    Quad(new Vector2(x, y), new Vector2(0.18f, 0.46f), new Color(0.18f, 0.23f, 0.26f));
-                    Quad(new Vector2(x, y + 0.14f), new Vector2(0.68f, 0.22f), new Color(0.28f, 0.34f, 0.36f));
-                    for (int lamp = 0; lamp < 4; lamp++)
-                        Quad(new Vector2(x - 0.23f + lamp * 0.155f, y + 0.14f), new Vector2(0.11f, 0.12f), new Color(0.88f, 0.9f, 0.72f));
-                }
         }
 
         private void Seat(Vector2 position, int index, int row, bool side)
         {
-            float hash = Mathf.Repeat(index * 0.6180339f + row * 0.37f, 1);
             Color seat = Color.Lerp(new Color(0.16f, 0.26f, 0.34f), new Color(0.25f, 0.37f, 0.44f), row * 0.35f);
             Quad(position, side ? new Vector2(0.19f, 0.21f) : new Vector2(0.21f, 0.19f), seat);
-            if (hash < 0.22f) return;
-            Color shirt = hash < 0.45f ? new Color(0.26f, 0.43f, 0.54f)
-                : hash < 0.7f ? new Color(0.46f, 0.5f, 0.44f) : new Color(0.48f, 0.29f, 0.29f);
-            Quad(position + new Vector2(0, -0.015f), new Vector2(0.095f, 0.07f), shirt);
-            Disc(position + new Vector2(0, 0.045f), 0.042f, new Color(0.46f, 0.38f, 0.3f), 6);
         }
 
         private void BuildMarkings()

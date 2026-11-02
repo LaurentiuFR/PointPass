@@ -16,8 +16,8 @@ namespace PointPass.Validation
                 StadiumBuilder.Build(root.transform);
                 MeshFilter[] filters = root.GetComponentsInChildren<MeshFilter>();
                 MeshRenderer[] renderers = root.GetComponentsInChildren<MeshRenderer>();
-                check(filters.Length == 2 && renderers.Length == 2,
-                    "Stadium dressing and markings use two static mesh renderers");
+                check(filters.Length == 11 && renderers.Length == 11,
+                    "Detailed stadium, lights, cameras, crowd, referee and pooled confetti use eleven mesh renderers");
                 check(root.GetComponentsInChildren<Collider2D>().Length == 0,
                     "Stadium presentation adds no physical obstacles");
                 check(renderers[0].sharedMaterial == renderers[1].sharedMaterial,
@@ -62,7 +62,7 @@ namespace PointPass.Validation
                     "Stadium rendering preserves eight pitch walls and two goal triggers");
                 Transform pitch = pitchRoot.transform.Find("Pitch");
                 BoxCollider2D top = pitch.Find("WallTop").GetComponent<BoxCollider2D>();
-                BoxCollider2D side = pitch.Find("WallRightUpper").GetComponent<BoxCollider2D>();
+                BoxCollider2D side = pitch.Find("GoalRight/WallRightUpper").GetComponent<BoxCollider2D>();
                 check(Mathf.Abs(top.transform.localPosition.y - top.size.y * 0.5f - MatchConfig.FieldHalfHeight) < 0.0001f
                     && Mathf.Abs(side.transform.localPosition.x - side.size.x * 0.5f - MatchConfig.FieldHalfWidth) < 0.0001f,
                     "Physical pitch wall faces remain aligned with the painted boundary");

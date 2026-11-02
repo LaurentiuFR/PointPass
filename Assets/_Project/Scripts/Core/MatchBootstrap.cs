@@ -21,6 +21,7 @@ namespace PointPass.Core
 
             ClearOldSceneObjects(scene);
             Physics2D.gravity = Vector2.zero;
+            QualitySettings.antiAliasing = 4;
             SetUpCamera();
 
             Transform root = new GameObject("Match").transform;
@@ -70,6 +71,8 @@ namespace PointPass.Core
             cam.backgroundColor = MatchConfig.Background;
             cam.transform.position = new Vector3(0f, 0f, -10f);
             cam.transform.rotation = Quaternion.identity;
+            cam.allowMSAA = true;
+            cam.allowDynamicResolution = false;
 
             if (cam.GetComponent<CameraFit>() == null) cam.gameObject.AddComponent<CameraFit>();
         }
@@ -94,7 +97,7 @@ namespace PointPass.Core
             Ball ball = go.AddComponent<Ball>();
 
             Vector2 ballSize = Vector2.one * MatchConfig.BallDiameter;
-            SpriteLibrary.Create(go.transform, "Shadow", "shadow", ballSize * 1.7f, Vector2.zero, 2, Color.black, true, true);
+            go.AddComponent<StadiumShadow>().Init(0.4f, 0.12f, 2);
             SpriteRenderer sprite = SpriteLibrary.Create(go.transform, "Sprite", "ball_polished", ballSize * 1.12f, Vector2.zero, 6, Color.white, true);
             ball.SetVisual(sprite.transform);
             return ball;
@@ -126,7 +129,7 @@ namespace PointPass.Core
             Color teamColor = team == Team.Blue ? MatchConfig.BlueTeam : MatchConfig.RedTeam;
             string spriteName = team == Team.Blue ? "player_blue_rigged" : "player_red_rigged";
 
-            SpriteLibrary.Create(go.transform, "Shadow", "shadow", size * 1.5f, Vector2.zero, 1, Color.black, true, true);
+            go.AddComponent<StadiumShadow>().Init(0.7f, 0.38f, 1);
 
             // Boots sit under the body so they tuck in and poke out as he runs
             Color bootColor = new Color(0.1f, 0.1f, 0.1f);
@@ -154,11 +157,22 @@ namespace PointPass.Core
         {
             Transform pivot = new GameObject(left ? "LeftArm" : "RightArm").transform;
             pivot.SetParent(player, false);
-            pivot.localPosition = new Vector3(left ? -0.36f : 0.36f, -0.1f, 0);
-            SpriteRenderer arm = SpriteLibrary.Create(pivot, "Forearm", "arm_runner", new Vector2(0.3f, 0.3f),
-                new Vector2(0, -0.12f), 4, new Color(0.8f, 0.55f, 0.3f), true);
-            arm.flipX = left;
+            pivot.localPosition = new Vector3(left ? -0.30f : 0.30f, -0.035f, 0);
+            CreateArmPart(pivot, "UpperArm", new Rect(0, 0.5f, 1, 0.5f), new Vector2(0.25f, 0.145f), new Vector2(0, -0.065f), left);
+            Transform elbow = new GameObject("Elbow").transform;
+            elbow.SetParent(pivot, false);
+            elbow.localPosition = new Vector3(0, -0.115f, 0);
+            CreateArmPart(elbow, "Forearm", new Rect(0, 0, 1, 0.53f), new Vector2(0.25f, 0.145f), new Vector2(0, -0.06f), left);
             return pivot;
+        }
+
+        private static void CreateArmPart(Transform parent, string name, Rect region, Vector2 size, Vector2 position, bool left)
+        {
+            SpriteRenderer part = SpriteLibrary.Create(parent, name, "arm_runner", size, position, 4, Color.white);
+            part.sprite = SpriteLibrary.GetRegion("arm_runner", region);
+            Vector2 native = part.sprite.bounds.size;
+            part.transform.localScale = new Vector3(size.x / native.x, size.y / native.y, 1);
+            part.flipX = left;
         }
     }
 }

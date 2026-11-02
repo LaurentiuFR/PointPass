@@ -30,6 +30,9 @@ namespace PointPass.Gameplay
         private MatchMenu menu;
         private bool userPaused;
         private float previousTimeScale = 1f;
+        private StadiumCrowd crowd;
+        private GoalConfetti confetti;
+        private SidelineReferee referee;
 
         public bool IsUserPaused => userPaused;
         public bool IsInMainMenu => phase == Phase.MainMenu;
@@ -41,6 +44,9 @@ namespace PointPass.Gameplay
             this.possession = possession;
             this.players = players;
             this.hud = hud;
+            crowd = GetComponentInChildren<StadiumCrowd>();
+            confetti = GetComponentInChildren<GoalConfetti>();
+            referee = GetComponentInChildren<SidelineReferee>();
             hud.PauseRequested += PauseMatch;
         }
 
@@ -80,6 +86,7 @@ namespace PointPass.Gameplay
             phase = Phase.Paused;
             blueScore = 0;
             redScore = 0;
+            confetti?.ResetMatch();
             half = 1;
             overtime = false;
             clock = MatchConfig.HalfSeconds;
@@ -96,6 +103,9 @@ namespace PointPass.Gameplay
 
             phase = Phase.Paused;
             hud.SetScore(blueScore, redScore);
+            crowd?.Celebrate(scoringTeam);
+            confetti?.Celebrate(scoringTeam);
+            referee?.SignalGoal(scoringTeam);
             StartCoroutine(GoalRoutine());
         }
 
@@ -195,7 +205,12 @@ namespace PointPass.Gameplay
         private IEnumerator GoalRoutine()
         {
             yield return null; // leave the physics callback before changing physics state
-            SetPlaying(false);
+            // Stop player control and possession, but let the shot finish against the net.
+            // The match phase already locks scoring and the clock during this celebration.
+            possession.Clear();
+            foreach (PlayerController player in players)
+                if (player != null) player.SetActive(false);
+            ball.SetCurve(0f);
             hud.ShowMessage("GOAL!");
             yield return new WaitForSeconds(MatchConfig.GoalPauseSeconds);
 
@@ -258,6 +273,10 @@ namespace PointPass.Gameplay
         // Every player returns to his kick-off spot and the ball becomes free.
         private void ResetPositions()
         {
+            crowd?.ResetCelebration();
+            confetti?.Clear();
+            referee?.ResetSignal();
+            foreach (GoalNet net in GetComponentsInChildren<GoalNet>()) net.ResetNet();
             possession.Clear();
             ball.ResetTo(Vector2.zero);
             foreach (PlayerController player in players)

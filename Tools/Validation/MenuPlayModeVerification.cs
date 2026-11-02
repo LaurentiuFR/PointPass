@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Reflection;
+using PointPass.Core;
 using PointPass.Gameplay;
 using PointPass.Players;
 using PointPass.UI;
@@ -234,7 +235,59 @@ namespace PointPass.Validation
                         if (phase != "Playing") return;
                         Check(player.IsActive && !manager.IsUserPaused && !menu.IsOpen && Time.timeScale == 1,
                             "Rematch kickoff completes and gameplay is active");
-                        Finish(true, "Main, Play, pause, resume, restart, controls, results and rematch passed in real Play Mode.");
+                        ball.ResetTo(new Vector2(MatchConfig.FieldHalfWidth - 1, 0.45f));
+                        ball.Body.linearVelocity = Vector2.right * 20;
+                        Advance(15);
+                        break;
+                    case 15:
+                        if (Read<int>(manager, "blueScore") != 1) return;
+                        if (EditorApplication.timeSinceStartup - SessionState.GetFloat(Key + "stageStarted", 0) < 0.35) return;
+                        Check(phase == "Paused" && ball.Body.simulated && !player.IsActive && !possession.HasOwner,
+                            "Goal celebration locks players and possession while ball physics continues");
+                        Check(ball.Body.position.x > MatchConfig.FieldHalfWidth + 0.25f && ball.Body.linearVelocity.magnitude < 5,
+                            "Real hard shot travels into the goal and loses energy against the net (position="
+                            + ball.Body.position + ", velocity=" + ball.Body.linearVelocity + ")");
+                        Check(Find<StadiumCrowd>().IsCelebrating, "Actual goal callback starts the crowd celebration");
+                        Check(Find<SidelineReferee>().SignalAmount>0.5f && Find<GoalConfetti>().IsActive,
+                            "Actual goal starts the referee signal and an occasional confetti burst");
+                        manager.OnGoal(Team.Blue);
+                        Check(Read<int>(manager, "blueScore") == 1, "Rebound cannot count the same goal twice");
+                        manager.PauseMatch();
+                        SessionState.SetFloat(Key + "bx", ball.Body.position.x);
+                        SessionState.SetFloat(Key + "by", ball.Body.position.y);
+                        Advance(16);
+                        break;
+                    case 16:
+                        if (EditorApplication.timeSinceStartup - SessionState.GetFloat(Key + "stageStarted", 0) < 0.25) return;
+                        Check(ball.Body.position == new Vector2(SessionState.GetFloat(Key + "bx", 0), SessionState.GetFloat(Key + "by", 0)),
+                            "User pause freezes a moving ball during a goal celebration");
+                        manager.ResumeMatch();
+                        Advance(17);
+                        break;
+                    case 17:
+                        if (phase != "Playing") return;
+                        Check(player.IsActive && ball.Body.simulated && !Find<StadiumCrowd>().IsCelebrating
+                            && ball.Body.position.sqrMagnitude < 0.01f,
+                            "Post-goal kickoff clears net, crowd and ball before restoring play");
+                        Check(!Find<GoalConfetti>().IsActive && Find<SidelineReferee>().SignalAmount==0,
+                            "Post-goal kickoff clears the referee signal and confetti");
+                        Write(manager, "overtime", true);
+                        ball.ResetTo(new Vector2(-MatchConfig.FieldHalfWidth + 1, -0.4f));
+                        ball.Body.linearVelocity = Vector2.left * 10;
+                        Advance(18);
+                        break;
+                    case 18:
+                        if (Read<int>(manager, "redScore") != 1) return;
+                        if (EditorApplication.timeSinceStartup - SessionState.GetFloat(Key + "stageStarted", 0) < 0.45) return;
+                        Check(ball.Body.simulated && ball.Body.position.x < -MatchConfig.FieldHalfWidth - 0.25f,
+                            "Left goal also lets a softer shot finish into the net");
+                        Advance(19);
+                        break;
+                    case 19:
+                        if (phase != "FullTime") return;
+                        Check(!ball.Body.simulated && menu.CurrentScreen == MatchMenu.Screen.Results,
+                            "Golden-goal celebration finishes at Results and freezes the ball");
+                        Finish(true, "Menus, rematch, both goal nets, celebration physics, pause and golden goal passed in real Play Mode.");
                         break;
                 }
             }

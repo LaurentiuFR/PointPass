@@ -32,9 +32,11 @@ namespace PointPass.Validation
                     importer.textureType = TextureImporterType.Sprite;
                     importer.spriteImportMode = SpriteImportMode.Single;
                     importer.alphaIsTransparency = true;
-                    importer.mipmapEnabled = false;
+                    importer.mipmapEnabled = true;
+                    importer.filterMode = FilterMode.Trilinear;
+                    importer.textureCompression = TextureImporterCompression.Uncompressed;
                     importer.maxTextureSize = path.EndsWith("_polished.png") || path.EndsWith("_rigged.png")
-                        || path.EndsWith("arm_runner.png") ? 512 : 2048;
+                        || path.EndsWith("arm_runner.png") ? 1024 : 2048;
                     importer.SaveAndReimport();
                 }
                 typeof(MatchBootstrap).GetMethod("Run", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, null);
@@ -73,6 +75,10 @@ namespace PointPass.Validation
                 Capture(camera, hud.GetComponent<Canvas>(), 1920, 1080, "../AppearanceVerification/match-preview.png");
 
                 hud.gameObject.SetActive(false);
+                player.CancelKick();
+                Call(player.GetComponent<PlayerAimGuide>(), "LateUpdate");
+                foreach (StadiumShadow shadow in UnityEngine.Object.FindObjectsByType<StadiumShadow>(FindObjectsSortMode.None))
+                    Call(shadow,"LateUpdate");
                 camera.transform.position = new Vector3(-1.25f, 0.03f, -10);
                 camera.orthographicSize = 0.95f;
                 Capture(camera, null, 1200, 900, "../AppearanceVerification/player-ball-preview.png");
@@ -89,6 +95,49 @@ namespace PointPass.Validation
                 player.transform.Find("Sprite").GetComponent<SpriteRenderer>().sprite = SpriteLibrary.Get("player_red_rigged");
                 Capture(camera, null, 1200, 900, "../AppearanceVerification/red-player-preview.png");
                 player.transform.Find("Sprite").GetComponent<SpriteRenderer>().sprite = SpriteLibrary.Get("player_blue_rigged");
+
+                player.Body.position = new Vector2(MatchConfig.FieldHalfWidth + 0.5f, 0);
+                player.transform.position = player.Body.position;
+                ball.ResetTo(new Vector2(MatchConfig.FieldHalfWidth + 0.65f, 0.65f));
+                camera.transform.position = new Vector3(MatchConfig.FieldHalfWidth + 0.1f, 0, -10);
+                camera.orthographicSize = 2.1f;
+                Capture(camera, null, 1400, 1200, "../AppearanceVerification/goal-layering-preview.png");
+                GoalNet net = player.transform.parent.Find("Pitch/GoalRight").GetComponent<GoalNet>();
+                net.Impact(new Vector2(MatchConfig.FieldHalfWidth + MatchConfig.GoalDepth, 0.65f), 20);
+                net.Advance(0.08f);
+                Capture(camera, null, 1400, 1200, "../AppearanceVerification/goal-impact-preview.png");
+                StadiumCrowd crowd = UnityEngine.Object.FindFirstObjectByType<StadiumCrowd>();
+                camera.transform.position = new Vector3(0, 6.85f, -10);
+                camera.orthographicSize = 0.7f;
+                Capture(camera, null, 1600, 800, "../AppearanceVerification/crowd-idle-preview.png");
+                crowd.Celebrate(Team.Blue); crowd.Advance(0.65f);
+                Capture(camera, null, 1600, 800, "../AppearanceVerification/crowd-goal-preview.png");
+                crowd.ResetCelebration(); net.ResetNet();
+                player.ResetToKickoff(); ball.ResetTo(Vector2.zero);
+                Call(player.GetComponent<PlayerAimGuide>(),"LateUpdate");
+                foreach (StadiumShadow shadow in UnityEngine.Object.FindObjectsByType<StadiumShadow>(FindObjectsSortMode.None))
+                    Call(shadow,"LateUpdate");
+
+                camera.transform.position = new Vector3(-10.55f,6.65f,-10);
+                camera.orthographicSize = 1.15f;
+                Capture(camera,null,1400,1000,"../AppearanceVerification/floodlight-preview.png");
+                camera.transform.position = new Vector3(-10.9f,2.85f,-10);
+                camera.orthographicSize = 0.85f;
+                Capture(camera,null,1200,1000,"../AppearanceVerification/broadcast-camera-preview.png");
+                SidelineReferee referee = UnityEngine.Object.FindFirstObjectByType<SidelineReferee>();
+                camera.transform.position = new Vector3(0.65f,-6.03f,-10);
+                camera.orthographicSize = 0.7f;
+                Capture(camera,null,1100,1000,"../AppearanceVerification/referee-idle-preview.png");
+                referee.SignalGoal(Team.Blue); referee.Advance(0.35f);
+                Capture(camera,null,1100,1000,"../AppearanceVerification/referee-goal-preview.png");
+                crowd.Celebrate(Team.Blue); crowd.Advance(0.7f);
+                GoalConfetti confetti=UnityEngine.Object.FindFirstObjectByType<GoalConfetti>();
+                confetti.Celebrate(Team.Blue); confetti.Advance(0.7f);
+                camera.transform.position=new Vector3(0,0,-10);
+                camera.aspect=16f/9f;
+                Call(camera.GetComponent<CameraFit>(),"LateUpdate");
+                Capture(camera,null,1920,1080,"../AppearanceVerification/stadium-celebration-preview.png");
+                crowd.ResetCelebration(); confetti.ResetMatch(); referee.ResetSignal();
 
                 camera.transform.position = new Vector3(0, 0, -10);
                 camera.aspect = 16f / 9f;
@@ -141,6 +190,7 @@ namespace PointPass.Validation
         private static void Capture(Camera camera, Canvas canvas, int width, int height, string path)
         {
             RenderTexture target = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32);
+            target.antiAliasing = 4;
             camera.targetTexture = target;
             camera.aspect = (float)width / height;
             if (canvas != null)
