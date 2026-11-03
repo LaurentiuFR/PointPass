@@ -17,6 +17,9 @@ namespace PointPass.Players
         [SerializeField] private float kickRecoverySeconds = 0.18f;
 
         private Rigidbody2D body;
+        private bool replicatedMotion;
+        private Vector2 replicatedVelocity;
+        public void SetReplicatedMotion(Vector2 velocity) { replicatedMotion = true; replicatedVelocity = velocity; }
         private Transform leftBoot;
         private Transform rightBoot;
         private Transform bodyVisual;
@@ -95,7 +98,7 @@ namespace PointPass.Players
         /// <summary>Called after a physical kick; never moves the player or the ball.</summary>
         public void PlayKick(PlayerKicker.KickType type)
         {
-            if (type == PlayerKicker.KickType.None || body == null || !body.simulated) return;
+            if (type == PlayerKicker.KickType.None || body == null || (!body.simulated && !replicatedMotion)) return;
             kickLeft = Mathf.Sin(Phase) >= 0f;
             kickStrength = type == PlayerKicker.KickType.Shot ? 1f : 0.7f;
             kickRemaining = Mathf.Max(0.01f, kickRecoverySeconds);
@@ -114,13 +117,14 @@ namespace PointPass.Players
                 AdvanceCelebration(Time.deltaTime);
                 return;
             }
-            if (!body.simulated)
+            if (!body.simulated && !replicatedMotion)
             {
                 ResetPose();
                 return;
             }
 
-            float speed = body.linearVelocity.magnitude;
+            Vector2 velocity = replicatedMotion ? replicatedVelocity : body.linearVelocity;
+            float speed = velocity.magnitude;
             Intensity = Mathf.MoveTowards(Intensity, Mathf.Clamp01(speed / Mathf.Max(0.01f, referenceSpeed)), 10f * Time.deltaTime);
             Phase = Mathf.Repeat(Phase + speed * radiansPerUnit * Time.deltaTime, Mathf.PI * 2f);
 
@@ -144,7 +148,7 @@ namespace PointPass.Players
                 rightBoot.localRotation = rightRotation * Quaternion.Euler(0, 0, -4f * step + rightStrike * 9f);
             }
 
-            Vector2 localVelocity = Quaternion.Inverse(Quaternion.Euler(0, 0, body.rotation)) * body.linearVelocity;
+            Vector2 localVelocity = Quaternion.Inverse(Quaternion.Euler(0, 0, body.rotation)) * velocity;
             lean = Vector2.Lerp(lean, Vector2.ClampMagnitude(localVelocity / 6.48f, 1f), 1f - Mathf.Exp(-14f * Time.deltaTime));
             // Project the shoulder swing along local forward/back, not out to the sides.
             // These children inherit facing, so the same gait works in every direction.

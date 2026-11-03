@@ -25,6 +25,7 @@ foreach ($name in @('com.unity.inputsystem','com.unity.ugui')) {
     if ($package.Count -ne 1) { throw "Expected one locally cached $name package." }
     $dependencies[$name] = 'file:' + $package[0].FullName.Replace('\','/')
 }
+& "$PSScriptRoot/Use-CachedRuntimePackages.ps1" -Dependencies $dependencies -RepositoryRoot $repositoryRoot
 @{ dependencies = $dependencies } | ConvertTo-Json | Set-Content "$previewRoot/Packages/manifest.json"
 $graphics = if ($VerifyMenus -and !$ReviewMatch) { '-nographics' } else { '-force-d3d11' }
 $method = if ($ReviewMatch) { 'PointPass.Validation.MatchVisualReview.Run' } elseif ($VerifyOffline) { 'PointPass.Validation.OfflineFeaturesPlayMode.Run' } elseif ($VerifyMenus) { 'PointPass.Validation.MenuPlayModeVerification.Run' } else { 'PointPass.Validation.AppearancePreview.Run' }

@@ -182,9 +182,10 @@ namespace PointPass.Players
         private void BeginKick(PlayerKicker.KickType type, KickSource source)
         {
             if (!isActiveAndEnabled || !focused || applicationPaused || !controller.IsActive || !wasControllerActive
-                || controller.ChargingKick != PlayerKicker.KickType.None) return;
-            controller.BeginKick(type);
-            if (controller.ChargingKick == type) kickSource = source;
+                || kickSource != KickSource.None || controller.ChargingKick != PlayerKicker.KickType.None) return;
+            // Own the release as soon as the command is accepted locally. A remote
+            // footballer's authoritative charge arrives in a later snapshot.
+            if (controller.BeginKick(type)) kickSource = source;
         }
 
         private void ReleaseKick(PlayerKicker.KickType type, KickSource source)
@@ -218,7 +219,6 @@ namespace PointPass.Players
 
         private void UpdateShotCurve(Keyboard keyboard, Gamepad gamepad)
         {
-            if (controller.ChargingKick != PlayerKicker.KickType.Shot) return;
             if (kickSource == KickSource.KeyboardShot)
                 controller.SetShotCurve((keyboard != null && keyboard.qKey.isPressed ? 1f : 0f)
                     - (keyboard != null && keyboard.eKey.isPressed ? 1f : 0f));

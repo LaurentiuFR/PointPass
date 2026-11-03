@@ -5,7 +5,7 @@ Mobile game for iOS (App Store) and Android (Google Play).
 ## Status
 Early development.
 
-Offline prototype: movement, physical ball control, scoring and timed matches. The PR 2 feature branch adds charged passing/shooting and held sprint through the shared player controller.
+Offline prototype: movement, physical ball control, scoring and timed matches. Charged passing/shooting, curved shots and held sprint use the shared player controller. A separate Windows host/client development mode is available; see [build and two-player testing](Tools/Validation/MULTIPLAYER.md).
 
 ## Prototype controls
 - Move: WASD/arrows, gamepad left stick, or the on-screen joystick.
@@ -13,6 +13,7 @@ Offline prototype: movement, physical ball control, scoring and timed matches. T
 - Shoot: hold **K** or **SHOOT**, then release.
 - Curve shots: flick sideways from **SHOOT** as you release. The bend follows the sideways component relative to your aim; a normal release stays straight. Keyboard: hold **Q/E** during a shot for left/right bend. Gamepad: use the **right stick** during a shot.
 - Sprint: hold **Left Shift** or **SPRINT**.
+- Multiplayer development statistics: **F3** toggles the FPS, ping/jitter, estimated loss, bandwidth and snapshot overlay.
 - Cancel a charge: **Escape**. Gamepad: **South** pass, **East** shoot, **Right Shoulder** sprint, **North** cancel.
 - Touch cancellation: tap the separate **CANCEL** control while holding Pass or Shoot. It clears the charge and ignores the old finger's release, retaining possession. Shoot shows straight/left/right bend strength while charging.
 - Pause/resume: **P**, gamepad **Start**, or the HUD pause button. In menus, use pointer/touch or arrows/stick plus **Enter/South**; **Escape/East** goes back.
@@ -57,7 +58,7 @@ Replay also provides **Pause/Resume**, **Restart**, and elapsed/total time. Paus
 
 The latest highlight is saved as `last-goal.json` under `Logs/Highlights` in the editor, or the application's persistent `Highlights` folder on devices. Each new highlight replaces the previous one. Legacy position-only clips remain viewable, but cannot recover previously unrecorded limbs, shot metadata or the longer celebration; score a new goal to capture these. This is an in-game replay, not a video export.
 
-The default test match has one human-controlled player. Multiplayer and AI are not implemented.
+The default offline test match has one human-controlled player. The Windows multiplayer development mode has one authoritative host and one client, each controlling a footballer on opposing teams. AI is not implemented.
 
 ## Validation
 See [the repeatable Unity engine checks](Tools/Validation/README.md). The checks use a separate temporary project and leave the main scene untouched. The real menu/coroutine smoke test runs with `./Tools/Validation/Render-AppearancePreview.ps1 -VerifyMenus`. Real-device multitouch, safe-area appearance, hardware controller navigation and gameplay feel still need hands-on testing.

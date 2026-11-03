@@ -43,10 +43,20 @@ namespace PointPass.Gameplay
         public bool IsUserPaused => userPaused;
         public bool IsInMainMenu => phase == Phase.MainMenu;
         public bool IsPracticing => practice != null && practice.IsRunning;
+        public bool IsPlaying => phase == Phase.Playing;
+        public bool IsFullTime => phase == Phase.FullTime;
+        public int BlueScore => blueScore;
+        public int RedScore => redScore;
+        public int Half => half;
+        public bool IsOvertime => overtime;
+        public float Clock => clock;
+        public string Message { get; private set; } = string.Empty;
+        public int ResetVersion { get; private set; }
         public event System.Action<Team> GoalScored;
         public event System.Action MatchWhistle;
 
-        public void Init(Ball ball, PossessionSystem possession, List<PlayerController> players, MatchHud hud)
+        public void Init(Ball ball, PossessionSystem possession, List<PlayerController> players, MatchHud hud,
+            bool authoritativeNetwork = false)
         {
             if (this.hud != null) this.hud.PauseRequested -= PauseMatch;
             this.ball = ball;
@@ -57,6 +67,9 @@ namespace PointPass.Gameplay
             confetti = GetComponentInChildren<GoalConfetti>();
             referee = GetComponentInChildren<SidelineReferee>();
             photographers = GetComponentInChildren<StadiumPhotographers>();
+            // Network clients receive match state; only the server runs these rules.
+            // Offline menu, practice and highlight capture remain an offline concern.
+            if (authoritativeNetwork) return;
             replay = GetComponent<GoalReplayRecorder>();
             if (replay == null) replay = gameObject.AddComponent<GoalReplayRecorder>();
             replay.Init(ball,players);
@@ -106,7 +119,7 @@ namespace PointPass.Gameplay
             RestoreGameTime();
             EndPractice();
             menu?.Hide();
-            hud.gameObject.SetActive(true);
+            hud?.gameObject.SetActive(true);
             SetPlayerInput(true);
             phase = Phase.Paused;
             blueScore = 0;
@@ -115,7 +128,7 @@ namespace PointPass.Gameplay
             half = 1;
             overtime = false;
             clock = MatchConfig.HalfSeconds;
-            hud.SetScore(0, 0);
+            hud?.SetScore(0, 0);
             StartCoroutine(KickoffRoutine("KICK OFF"));
         }
 
@@ -129,9 +142,9 @@ namespace PointPass.Gameplay
             replay?.SetRecording(false);
             menu?.SetPracticeMode(true);
             menu?.Hide();
-            hud.gameObject.SetActive(true);
-            hud.SetPracticeMode(true);
-            hud.ShowMessage(string.Empty);
+            hud?.gameObject.SetActive(true);
+            hud?.SetPracticeMode(true);
+            ShowMessage(string.Empty);
             phase = Phase.Practice;
             SetPlayerInput(true);
             practice.BeginSession();
@@ -161,7 +174,7 @@ namespace PointPass.Gameplay
 
             phase = Phase.Paused;
             GoalScored?.Invoke(scoringTeam);
-            hud.SetScore(blueScore, redScore);
+            hud?.SetScore(blueScore, redScore);
             crowd?.Celebrate(scoringTeam);
             confetti?.Celebrate(scoringTeam);
             referee?.SignalGoal(scoringTeam);
@@ -213,8 +226,8 @@ namespace PointPass.Gameplay
             SetPlaying(true);
             ResetPositions();
             SetPlaying(false);
-            hud.ShowMessage(string.Empty);
-            hud.gameObject.SetActive(false);
+            ShowMessage(string.Empty);
+            hud?.gameObject.SetActive(false);
             menu?.ShowMain();
         }
 
@@ -225,7 +238,7 @@ namespace PointPass.Gameplay
             userPaused = true;
             Time.timeScale = 0f;
             SetPlayerInput(false);
-            hud.gameObject.SetActive(false);
+            hud?.gameObject.SetActive(false);
             menu.ShowPause();
         }
 
@@ -234,7 +247,7 @@ namespace PointPass.Gameplay
             if (!userPaused) return;
             RestoreGameTime();
             menu?.Hide();
-            hud.gameObject.SetActive(true);
+            hud?.gameObject.SetActive(true);
             SetPlayerInput(true);
         }
 
@@ -262,10 +275,10 @@ namespace PointPass.Gameplay
             SetPlaying(false);
 
             UpdateClock();
-            hud.ShowMessage(message);
+            ShowMessage(message);
             yield return new WaitForSeconds(MatchConfig.KickoffPauseSeconds);
 
-            hud.ShowMessage(string.Empty);
+            ShowMessage(string.Empty);
             SetPlaying(true);
             phase = Phase.Playing;
             MatchWhistle?.Invoke();
@@ -280,7 +293,8 @@ namespace PointPass.Gameplay
             foreach (PlayerController player in players)
                 if (player != null) player.SetActive(false);
             ball.SetCurve(0f);
-            hud.ShowGoalMessage(lastScoringTeam,wasOwnGoal);
+            Message = lastScoringTeam == Team.Blue ? "BLUE GOAL!" : "RED GOAL!";
+            hud?.ShowGoalMessage(lastScoringTeam,wasOwnGoal);
             yield return new WaitForSeconds(MatchConfig.GoalPauseSeconds);
             replay?.CompleteGoalCapture();
 
@@ -304,7 +318,7 @@ namespace PointPass.Gameplay
 
             if (half == 1)
             {
-                hud.ShowMessage("HALF TIME");
+                ShowMessage("HALF TIME");
                 yield return new WaitForSeconds(MatchConfig.HalfTimePauseSeconds);
                 half = 2;
                 clock = MatchConfig.HalfSeconds;
@@ -320,7 +334,7 @@ namespace PointPass.Gameplay
 
             overtime = true;
             clock = MatchConfig.OvertimeSeconds;
-            hud.ShowMessage("TIED!");
+            ShowMessage("TIED!");
             yield return new WaitForSeconds(MatchConfig.HalfTimePauseSeconds);
             yield return KickoffRoutine("GOLDEN GOAL");
         }
@@ -331,18 +345,19 @@ namespace PointPass.Gameplay
             phase = Phase.FullTime;
             SetPlayerInput(false);
             SetPlaying(false);
-            hud.SetClockText("FULL TIME");
+            hud?.SetClockText("FULL TIME");
             if (menu != null)
             {
-                hud.gameObject.SetActive(false);
+                hud?.gameObject.SetActive(false);
                 menu.ShowResults(blueScore, redScore);
             }
-            else hud.ShowMessage("FULL TIME\n" + MatchHud.ScoreLine(blueScore, redScore));
+            else ShowMessage("FULL TIME\n" + MatchHud.ScoreLine(blueScore, redScore));
         }
 
         // Every player returns to his kick-off spot and the ball becomes free.
         private void ResetPositions()
         {
+            ResetVersion++;
             replay?.ResetHistory();
             photographers?.ResetFlashes();
             hud?.ClearGoalReplayCue();
@@ -371,10 +386,16 @@ namespace PointPass.Gameplay
             }
         }
 
+        private void ShowMessage(string text)
+        {
+            Message = text;
+            hud?.ShowMessage(text);
+        }
+
         private void UpdateClock()
         {
             string label = overtime ? "GOLDEN GOAL" : (half == 1 ? "1ST HALF" : "2ND HALF");
-            hud.SetClock(label, clock);
+            hud?.SetClock(label, clock);
         }
 
         private void OnApplicationPause(bool paused)

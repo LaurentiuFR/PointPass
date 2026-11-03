@@ -1,5 +1,7 @@
 # PR 2 engine validation
 
+For the Windows host/client prototype, use the separate [multiplayer build and two-instance verification guide](MULTIPLAYER.md).
+
 Run from PowerShell after opening PointPass in Unity at least once:
 
 ```powershell

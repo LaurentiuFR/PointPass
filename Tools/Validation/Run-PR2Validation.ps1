@@ -50,6 +50,7 @@ foreach ($packageName in @('com.unity.inputsystem', 'com.unity.ugui')) {
     if ($package.Count -ne 1) { throw "Open the main project in Unity first to resolve $packageName; expected one cached version." }
     $dependencies[$packageName] = 'file:' + $package[0].FullName.Replace('\', '/')
 }
+& "$PSScriptRoot/Use-CachedRuntimePackages.ps1" -Dependencies $dependencies -RepositoryRoot $repositoryRoot
 @{ dependencies = $dependencies } | ConvertTo-Json | Set-Content "$validationRoot/Packages/manifest.json"
 
 $started = Get-Date

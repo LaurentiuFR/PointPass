@@ -17,6 +17,7 @@ namespace PointPass.Core
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Run()
         {
+            if (PointPass.Networking.NetworkDevelopmentBootstrap.TryStart()) return;
             Scene scene = SceneManager.GetActiveScene();
 
             ClearOldSceneObjects(scene);
@@ -45,7 +46,7 @@ namespace PointPass.Core
         }
 
         // Removes leftovers from hand-built scenes. Keeps cameras, lights and the EventSystem.
-        private static void ClearOldSceneObjects(Scene scene)
+        internal static void ClearOldSceneObjects(Scene scene)
         {
             foreach (GameObject root in scene.GetRootGameObjects())
             {
@@ -56,7 +57,7 @@ namespace PointPass.Core
             }
         }
 
-        private static void SetUpCamera()
+        internal static void SetUpCamera()
         {
             Camera cam = Camera.main;
             if (cam == null)
