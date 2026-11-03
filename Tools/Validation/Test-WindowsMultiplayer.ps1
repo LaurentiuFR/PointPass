@@ -144,7 +144,9 @@ try {
     Wait-For { (Read-State host).redKicks -gt $redKicks } 'Client charged pass executes on host'
     Wait-For { (Read-State host).owner -eq 0 -and (Read-State client).owner -eq 0 } 'Return pass is physically received by blue'
     foreach ($inputCase in @('touchShot', 'keyShot', 'touchPass')) {
-        Fixture @{ blueX = 5; blueY = 3; redX = 0; redY = 0; ballX = -0.65; ballY = 0 }
+        # Keep isolated input kicks outside the goal mouth: faster passes must not start
+        # a legitimate goal celebration/reset in the middle of the next fixture.
+        Fixture @{ blueX = 5; blueY = -3; redX = 0; redY = 3; ballX = -0.65; ballY = 3 }
         Wait-For { (Read-State client).owner -eq 1 } "Client has possession for $inputCase human-input regression"
         $redKicks = (Read-State host).redKicks
         if ($inputCase -eq 'touchShot') {

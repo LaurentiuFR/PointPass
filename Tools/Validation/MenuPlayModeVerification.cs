@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using PointPass.Core;
 using PointPass.Gameplay;
@@ -109,7 +110,8 @@ namespace PointPass.Validation
 
                 MatchManager manager = Find<MatchManager>();
                 MatchMenu menu = Find<MatchMenu>();
-                PlayerController player = Find<PlayerController>();
+                PlayerController player = UnityEngine.Object.FindObjectsByType<PlayerController>(FindObjectsSortMode.None)
+                    .FirstOrDefault(p => p.GetComponent<HumanPlayerInput>() != null);
                 Ball ball = Find<Ball>();
                 if (manager == null || menu == null || player == null || ball == null) return;
                 PossessionSystem possession = Read<PossessionSystem>(manager, "possession");
@@ -126,6 +128,7 @@ namespace PointPass.Validation
                         Advance(1);
                         break;
                     case 1:
+                        Click(menu, "Play");
                         Click(menu, "PlayOffline");
                         Check(!menu.IsOpen && !player.IsActive, "Play button enters the real frozen kickoff countdown");
                         Advance(2);
@@ -192,16 +195,17 @@ namespace PointPass.Validation
                         break;
                     case 8:
                         Click(menu, "HowToPlay");
-                        Check(menu.CurrentScreen == MatchMenu.Screen.Controls && manager.IsInMainMenu,
+                        Check(menu.CurrentScreen == MatchMenu.Screen.Main && menu.Lobby.ModalOpen && manager.IsInMainMenu,
                             "How to Play opens without starting gameplay");
                         Advance(9);
                         break;
                     case 9:
-                        Click(menu, "Back");
-                        Check(menu.CurrentScreen == MatchMenu.Screen.Main, "Controls Back returns to Main");
+                        Click(menu, "GuidePrevious");
+                        Check(menu.CurrentScreen == MatchMenu.Screen.Main && !menu.Lobby.ModalOpen, "Controls Back returns to Main");
                         Advance(10);
                         break;
                     case 10:
+                        Click(menu, "Play");
                         Click(menu, "PlayOffline");
                         Advance(11);
                         break;
@@ -235,7 +239,7 @@ namespace PointPass.Validation
                         if (phase != "Playing") return;
                         Check(player.IsActive && !manager.IsUserPaused && !menu.IsOpen && Time.timeScale == 1,
                             "Rematch kickoff completes and gameplay is active");
-                        ball.ResetTo(new Vector2(MatchConfig.FieldHalfWidth - 1, 0.45f));
+                        ball.ResetTo(new Vector2(MatchConfig.FieldHalfWidth - 0.6f, 1.1f));
                         ball.Body.linearVelocity = Vector2.right * 20;
                         Advance(15);
                         break;
@@ -272,7 +276,7 @@ namespace PointPass.Validation
                         Check(!Find<GoalConfetti>().IsActive && Find<SidelineReferee>().SignalAmount==0,
                             "Post-goal kickoff clears the referee signal and confetti");
                         Write(manager, "overtime", true);
-                        ball.ResetTo(new Vector2(-MatchConfig.FieldHalfWidth + 1, -0.4f));
+                        ball.ResetTo(new Vector2(-MatchConfig.FieldHalfWidth + 0.6f, -1.1f));
                         ball.Body.linearVelocity = Vector2.left * 10;
                         Advance(18);
                         break;

@@ -85,6 +85,7 @@ namespace PointPass.Players
         {
             if (CommandSink != null) CommandSink.SetSprint(IsActive && held); else Movement.SetSprint(IsActive && held);
         }
+        public void SetAim(Vector2 direction) { if (IsActive) Movement.SetAimDirection(direction); }
 
         // ---- Match control (used by MatchManager) ----
 

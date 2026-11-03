@@ -43,3 +43,34 @@ Run `./Tools/Validation/Render-AppearancePreview.ps1 -VerifyOffline` for the new
 Before committing, playtest soft/hard/off-centre shots into both nets; walk into each goal; watch crowd and arm motion at run/sprint speed; pause during a goal and restart the match. Assess image quality in a Game view at 1x or a fixed 1920x1080 resolution rather than enlarging a low-resolution preview. Device frame rate, touchscreen behavior and the subjective animation/shot feel still need hands-on testing.
 
 Run `./Tools/Validation/Render-AppearancePreview.ps1 -VerifyMenus` for a real Play Mode smoke test in that disposable project. It enters Play Mode, exercises the actual startup and kickoff coroutines, pauses/resumes, restarts, returns home, navigates controls, shortens a test-only final-period clock, checks Results and starts a rematch. It exits Play Mode and Unity automatically, with a 45-second timeout. Reports are `Logs/AppearanceVerification/playmode-tests.txt` and `menu-playmode.log`. No production match durations or scene files are changed.
+
+
+## Live goalkeeper and audio review
+
+With the real project open in Unity, use the installed Pipeline CLI:
+
+```powershell
+unity command set_auto_tick --project-path C:/Dev/PointPass --caller plugin --skill unity-cli
+unity command editor.playmode start --project-path C:/Dev/PointPass --caller plugin --skill unity-cli
+unity status --until-ready --project-path C:/Dev/PointPass
+unity command script run --project-path C:/Dev/PointPass --timeout 65 --caller plugin --skill unity-cli -- --file Tools/Validation/GoalkeeperPlayMode.cs --entry PointPass.Validation.GoalkeeperPlayMode.Run --timeout 60
+```
+
+The review operates the actual menu and physics in the main project's Play Mode. It temporarily disables human input, creates a test receiver, exercises 10m tap and 14m charged passes, catches/distributions at both goals, pause during a keeper distribution, hard-shot parrying, reaction-delayed diving, beatable corner shots, mirrored crowd audio, bounded mix output, new highlights and keeper replay rigs, and practice/reset flow. It restores sound preferences and human input and returns to Main Menu. Do not manually stop Play Mode while it runs. It resumes incidental editor-focus pauses and simulates game focus for sound playback during the review; production focus-pause behaviour remains unchanged.
+
+Reports and native Game-view captures go to ignored `Logs/KeeperVerification`. Frame time and GC measurements include editor, replay-recording and validation overhead and do not establish mobile performance. The native menu capture, goal moment, keeper dive/replay and sound settings should also be visually inspected. Headphone balance, real touchscreen input and keeper difficulty still benefit from hands-on playtesting.
+
+
+## PointPass lobby review
+
+`LobbyValidation` is included in the engine regression suite and covers all squad sizes, locked/central slots, preview guest input, six-page routing, persistent gold/points purchases, duplicate-purchase protection, inventory equipment and sound settings.
+
+For the current front end, run the real-project review in Play Mode:
+
+```powershell
+unity command script run --project-path C:/Dev/PointPass --timeout 65 --caller plugin --skill unity-cli -- --file Tools/Validation/FigmaMenuPlayMode.cs --entry PointPass.Validation.FigmaMenuPlayMode.Run --timeout 60000
+```
+
+This current clubhouse review checks pointer navigation, all three saved colour choices, the rendered footballer, My Club's URP camera targets, passing practice, free play, a penalty preset and keeper difficulty through the actual buttons. It captures native 844x390, 1280x720, 1920x1080 and 1280x960 views, restores the prior view and input/theme preferences, and checks that rendering and viewport cleanup emit no runtime errors. Reports and screenshots are in ignored `Logs/PdfMenuReview`. Avoid manually stopping Play Mode during the review. `LobbyPlayMode.cs` targets the superseded five-pod layout; the engine suite still covers wallet persistence and six-page data routing. The disposable `-VerifyMenus` smoke test has also been updated for the clubhouse and defending keepers.
+
+See [the menu/multiplayer integration record](MENU_INTEGRATION.md) for the combined branch, compatibility decisions and validation results.

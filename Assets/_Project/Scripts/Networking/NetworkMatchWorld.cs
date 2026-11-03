@@ -127,7 +127,7 @@ namespace PointPass.Networking
                 Root.GetComponentInChildren<GoalConfetti>()?.Celebrate(team);
                 Root.GetComponentInChildren<SidelineReferee>()?.SignalGoal(team);
                 Root.GetComponentInChildren<StadiumPhotographers>()?.Celebrate();
-                audio.Play(PointPass.Audio.FootballAudio.Cue.Goal);
+                audio.PlayGoal(team);
             }
             if (hasPresented && state.Playing && !presentedPlaying) audio.Play(PointPass.Audio.FootballAudio.Cue.Whistle);
             presentedGoals = goals;

@@ -72,9 +72,9 @@ namespace PointPass.Validation
                 int emitted = 0; FootballAudio.Cue last = FootballAudio.Cue.Whistle;
                 audio.Played += cue => { emitted++; last = cue; };
                 AudioSource source = audio.GetComponent<AudioSource>();
-                check(source != null && !source.playOnAwake && source.spatialBlend == 0 && source.volume == 0.45f
-                    && root.GetComponents<AudioSource>().Length == 1,
-                    "Live football audio reuses one controlled 2D source with saved volume");
+                check(source != null && !source.playOnAwake && source.spatialBlend == 0 && Mathf.Approximately(source.volume, 0.45f * 0.9f)
+                    && root.GetComponents<AudioSource>().Length == 5,
+                    "Live football audio reuses five bounded 2D voices with master-volume headroom");
                 possession.TryAcquire(player); player.BeginKick(PlayerKicker.KickType.Pass);
                 player.ReleaseKick(PlayerKicker.KickType.Pass); Call(kicker, "FixedUpdate"); Call(kicker, "FixedUpdate");
                 check(emitted == 1 && last == FootballAudio.Cue.Pass,

@@ -23,6 +23,9 @@ namespace PointPass.Core
         public const float BallDiameter = 0.5f;
         public const float PlayerDiameter = 1f;
         public const float PlayerColliderRadius = 0.4f;
+        public const float PassMinimumSpeed = 12f;
+        public const float PassMaximumSpeed = 21f;
+        public const float PitchBallDamping = 0.45f;
 
         // Match rules
         public const float HalfSeconds = 90f;

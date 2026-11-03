@@ -72,7 +72,7 @@ namespace PointPass.Players
             float length = shooting ? Mathf.Lerp(2.3f, 4.5f, charge) : Mathf.Lerp(1.1f, 2.5f, charge);
             // This is a short direction cue, not a landing-point guarantee: collisions and
             // drag still determine the actual physical shot after release.
-            float speed = shooting ? Mathf.Lerp(10f, 20f, charge) : Mathf.Lerp(8f, 14f, charge);
+            float speed = shooting ? Mathf.Lerp(10f, 20f, charge) : Mathf.Lerp(MatchConfig.PassMinimumSpeed, MatchConfig.PassMaximumSpeed, charge);
             float travelTime = length / speed;
             float curve = shooting ? controller.ShotCurve : 0f;
             const int segments = 16;

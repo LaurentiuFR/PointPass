@@ -70,17 +70,17 @@ Reports, player logs, CSV snapshots and screenshots go to `Logs/NetworkVerificat
 - The host simulates all three dynamic bodies. Client rigidbodies and colliders do not simulate; movement, dribbling, ball physics and kicking components are disabled there. Received state controls presentation and possession feedback.
 - Commands use reliable sequenced NGO named messages, with movement/sprint heartbeats at 30 Hz. Every command includes retained aim, so a direction tap shorter than a heartbeat still reaches the kicker after movement stops. Host snapshots use unreliable sequenced messages at up to 30 Hz. Clients interpolate approximately 100 ms behind the latest state, and snap cleanly across explicit reset versions. Animation velocity, kick events and ball roll follow replicated state.
 - Actors are spawned through the existing runtime factories, rather than network prefab instances. NGO manages the connection and custom messages; the server's fixed two-slot roster manages actor lifecycle and ownership. No prefab or scene edits are needed. NGO may generate an empty default prefab-list asset during import.
-- The connection payload checks the `PointPass-PC-2` protocol identifier and `Application.version`. Bump the protocol identifier and message names when changing message layout/rules incompatibly; distribute the same build to both players. This is a version check, not account authentication.
+- The connection payload checks the `PointPass-PC-3` compatibility identifier and `Application.version`. The menu integration changes shared passing speeds, damping and reception rules, so older `PC-2` players are rejected rather than mixing gameplay rules. The input/state message layouts remain version 2. Bump the message names when changing their layouts; distribute the same build to both players. This is a version check, not account authentication.
 
 The simulation rules can initialize without a HUD. A later dedicated-server milestone must also remove actor/world presentation creation and local-player composition; this milestone is a player-hosted match.
 
 ## Current limits
 
-- Two players only, with one on each team. No AI, team selection, public matchmaking, join codes, cloud setup or paid services.
+- Network matches have two human players only, with one on each team. Offline goalkeeper AI and clubhouse preview squad slots are not created in the network world. No network team selection, public matchmaking, join codes, cloud setup or paid services.
 - No client prediction or reconciliation yet. Client controls and charge feedback include network delay and the presentation buffer. High-latency/loss tuning is a later LAN/internet validation step.
 - Offline highlights/practice remain offline; network goal replay is not implemented. Client presentation reproduces goals, player animations and crowd reactions, but physical net-impact ripple events are not yet replicated.
 - The host listens on IPv4 UDP; this milestone is verified on loopback. Second-PC Wi-Fi and physical iPhone testing are separate milestones. No router forwarding is needed for a later LAN test. Do not disable Windows Firewall; if LAN access needs a rule, limit it to the test executable, selected UDP port, Private profile and local subnet.
-- Main-menu design and integration remain separate work. The development panel is temporary.
+- The clubhouse main menu is integrated with offline gameplay. Its online match-format controls remain labelled previews; actual multiplayer still uses the separate temporary development panel and launch arguments above.
 
 ## Validation record
 

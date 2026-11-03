@@ -12,6 +12,12 @@ New-Item -ItemType Directory -Force -Path "$previewRoot/Assets/Scripts", "$previ
 Get-ChildItem "$repositoryRoot/Assets/_Project/Scripts" -Recurse -Filter '*.cs' | Copy-Item -Destination "$previewRoot/Assets/Scripts"
 Get-ChildItem "$repositoryRoot/Assets/_Project/Resources/Art" -File |
     Where-Object { $_.Extension -in @('.png', '.shader', '.cginc') } | Copy-Item -Destination "$previewRoot/Assets/Resources/Art"
+foreach ($resourceFolder in @('Audio', 'Fonts', 'Menu')) {
+    $destination = Join-Path "$previewRoot/Assets/Resources" $resourceFolder
+    New-Item -ItemType Directory -Force -Path $destination | Out-Null
+    Get-ChildItem "$repositoryRoot/Assets/_Project/Resources/$resourceFolder" -File |
+        Where-Object { $_.Extension -ne '.meta' } | Copy-Item -Destination $destination
+}
 Copy-Item "$PSScriptRoot/AppearancePreview.cs" "$previewRoot/Assets/Editor/AppearancePreview.cs"
 Copy-Item "$PSScriptRoot/MenuPlayModeVerification.cs" "$previewRoot/Assets/Editor/MenuPlayModeVerification.cs"
 Copy-Item "$PSScriptRoot/MatchVisualReview.cs" "$previewRoot/Assets/Editor/MatchVisualReview.cs"

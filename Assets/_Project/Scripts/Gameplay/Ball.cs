@@ -1,5 +1,6 @@
 using UnityEngine;
 using PointPass.Players;
+using PointPass.Core;
 
 namespace PointPass.Gameplay
 {
@@ -23,7 +24,16 @@ namespace PointPass.Gameplay
         public Rigidbody2D Body { get; private set; }
         public Collider2D Collider { get; private set; }
         public PlayerController LastTouch { get; private set; }
+        public PlayerController LastKicker { get; private set; }
+        public bool LastKickWasPass { get; private set; }
         public void RecordTouch(PlayerController player) => LastTouch = player;
+        public void RecordKick(PlayerController player,bool pass)
+        {
+            LastTouch = LastKicker = player; LastKickWasPass = pass;
+        }
+        public PlayerController GoalScorer(Team scoringTeam) => LastTouch != null
+            && LastTouch.GetComponent<GoalkeeperBrain>() != null && LastKicker != null && LastKicker.Team == scoringTeam
+                ? LastKicker : LastTouch;
         public float Curve => curveRemaining > 0f ? curveStrength * curveRemaining / Mathf.Max(0.01f, curveDuration) : 0f;
 
         /// <summary>Predicted heading change in degrees for a new shot, before collisions or drag.</summary>
@@ -121,6 +131,7 @@ namespace PointPass.Gameplay
         public void ResetTo(Vector2 position)
         {
             LastTouch = null;
+            LastKicker = null; LastKickWasPass = false;
             if (settlingInNet) Body.linearDamping = fieldDamping;
             settlingInNet = false;
             SetCurve(0f);

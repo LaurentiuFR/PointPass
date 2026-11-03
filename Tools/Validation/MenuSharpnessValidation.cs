@@ -21,15 +21,12 @@ namespace PointPass.Validation
             {
                 menu.ShowMain();
                 Transform main = menu.transform.Find("SafeArea/Content/Main");
-                Image hero = main.Find("HeroCard/Hero/Player").GetComponent<Image>();
-                check(hero.color == Color.white && hero.material == hero.defaultMaterial,
-                    "Menu hero preserves source shading with a Canvas-compatible material");
-                check(!main.Find("HeroCard/TacticalPitch").GetComponent<FootballGraphic>().ShowRoute
-                    && main.Find("WordmarkUnderline") == null && main.Find("HeroCard/Accent") == null,
-                    "Menu has no unexplained route line or isolated character underline");
-                check(MatchPalette.Ink.b > MatchPalette.Ink.g * 1.8f
-                    && (int)MatchPalette.Theme >= 0 && (int)MatchPalette.Theme <= 2,
-                    "Shared identity uses deep navy with a selectable interface accent");
+                check(main.Find("HeroCard") == null && main.GetComponent<LobbyMenuView>() != null,
+                    "Main menu replaces the overhead promotional card with the clubhouse lobby");
+                check(main.Find("SettingsPage/Options/ColourScheme") != null,
+                    "Lobby Settings preserves the selectable interface colour schemes");
+                check(MatchPalette.Ink.b > MatchPalette.Ink.g * 1.8f,
+                    "Shared identity retains the deep navy base with selectable accents");
                 GoalReplayView replay = menu.GetComponentInChildren<GoalReplayView>(true);
                 replay.SetPlaybackSpeed(1.5f);
                 replay.SetShowShotArrow(true);
@@ -43,9 +40,9 @@ namespace PointPass.Validation
                             new Vector3(expected.r, expected.g, expected.b)) < 0.001f
                         && Mathf.Approximately(rim.color.a, rimAlpha),
                         scheme + " updates the existing HUD accent while retaining its opacity");
-                    check(main.Find("Wordmark").GetComponent<Text>().text.Contains("#" + MatchPalette.AccentHex)
+                    check(main.Find("GlobalHeader/Wordmark").GetComponent<Text>().text.Contains("#" + MatchPalette.AccentHex)
                         && PlayerPrefs.GetInt(MatchPalette.ThemePreferenceKey) == (int)scheme,
-                        scheme + " updates rich-text branding and saves the selected scheme");
+                        scheme + " updates lobby branding and saves the selected preference");
                 }
                 check(replay.PlaybackSpeed == 1.5f && replay.ShowShotArrow,
                     "Colour changes preserve replay speed and shot-arrow settings");

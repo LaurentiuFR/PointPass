@@ -15,7 +15,7 @@ namespace PointPass.Networking
     {
         private const string InputMessage = "PointPass/Input/2";
         private const string StateMessage = "PointPass/State/2";
-        public const string Protocol = "PointPass-PC-2";
+        public const string Protocol = "PointPass-PC-3";
         private const string ProbeMessage = "PointPass/Diagnostics/1";
         private NetworkManager manager;
         private UnityTransport transport;
