@@ -12,6 +12,7 @@ namespace PointPass.UI
         private RectTransform handle;
         private float deadzone = 0.1f;
         private int? pointerId;
+        public float Sensitivity { get; set; } = 1f;
 
         public Vector2 Value { get; private set; }
 
@@ -65,7 +66,7 @@ namespace PointPass.UI
             float radius = background.rect.width * 0.5f;
             Vector2 normalized = Vector2.ClampMagnitude(local / radius, 1f);
 
-            Value = normalized.magnitude < deadzone ? Vector2.zero : normalized;
+            Value = normalized.magnitude < deadzone ? Vector2.zero : Vector2.ClampMagnitude(normalized * Mathf.Clamp(Sensitivity,.5f,2f),1f);
 
             if (handle != null) handle.anchoredPosition = normalized * radius;
         }

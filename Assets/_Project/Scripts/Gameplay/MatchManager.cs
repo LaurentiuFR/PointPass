@@ -215,7 +215,7 @@ namespace PointPass.Gameplay
         {
             bool pausePress = (Keyboard.current != null && Keyboard.current.pKey.wasPressedThisFrame)
                 || (Gamepad.current != null && Gamepad.current.startButton.wasPressedThisFrame);
-            if (pausePress && menu != null)
+            if (pausePress && menu != null && !MobileControlEditor.IsOpen)
             {
                 if (userPaused) ResumeMatch();
                 else PauseMatch();

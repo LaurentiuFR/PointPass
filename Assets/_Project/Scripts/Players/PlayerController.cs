@@ -15,6 +15,10 @@ namespace PointPass.Players
         private Dribbler dribbler;
         private PlayerKicker kicker;
         private bool inputEnabled = true;
+        private PlayerTackler tackler;
+        public PlayerTackler Tackler => tackler != null ? tackler : (tackler = GetComponent<PlayerTackler>());
+        public PlayerStamina Stamina => Movement.Stamina;
+        public bool RequestTackle() => IsActive && (CommandSink != null ? CommandSink.RequestTackle() : Tackler != null && Tackler.Request());
         public IPlayerCommandSink CommandSink { get; set; }
         private PlayerKicker Kicker => kicker != null ? kicker : (kicker = GetComponent<PlayerKicker>());
         public float KickCharge => CommandSink != null ? CommandSink.KickCharge : Kicker != null ? Kicker.Charge : 0f;
@@ -64,6 +68,7 @@ namespace PointPass.Players
         public bool BeginKick(PlayerKicker.KickType type)
         {
             if (!IsActive || type == PlayerKicker.KickType.None) return false;
+            if (Tackler != null && !Tackler.CanAct) return false;
             if (CommandSink != null) return CommandSink.BeginKick(type);
             Kicker?.Begin(type);
             return Kicker != null && Kicker.Charging == type;
@@ -108,6 +113,7 @@ namespace PointPass.Players
 
         public void ResetToKickoff()
         {
+            Tackler?.ResetChallenge();
             CancelActions();
             if (Dribbler != null) Dribbler.Release();
             Movement.ResetTo(KickoffPosition, KickoffAngle);

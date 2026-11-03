@@ -4,25 +4,21 @@ using UnityEngine;
 namespace PointPass.Players
 {
     /// <summary>
-    /// Close control. When the ball is in front of the player's feet he asks the PossessionSystem
-    /// for it; if he gets it, the ball follows a point just ahead of his boots and is nudged in
-    /// time with his stride. Ownership lives in PossessionSystem, never here, and nothing in this
-    /// class depends on who is controlling the player.
+    /// Contact-based control: discrete boot touches preserve a free, interceptable ball.
     /// </summary>
     [RequireComponent(typeof(PlayerController))]
     public class Dribbler : MonoBehaviour
     {
         [Header("Pick-up")]
-        [SerializeField] private float acquireRadius = 0.85f;
-        [SerializeField] private float releaseRadius = 1.55f;
+        [SerializeField] private float acquireRadius = 0.25f;
+        [SerializeField] private float releaseRadius = 0.64f;
         [SerializeField] private float maxPickupSpeed = 11f;
         [SerializeField] private float pickupCooldown = 0.25f;
 
         [Header("Feet")]
-        [SerializeField] private float baseLead = 0.64f;   // ball distance in front of his centre
-        [SerializeField] private float touchLead = 0.09f;  // extra push on each touch
-        [SerializeField] private float sway = 0.07f;       // side-to-side movement toward the active foot
-        [SerializeField] private float followGain = 20f;   // how tightly the ball tracks his feet
+        [SerializeField] private float baseLead = 0.53f;
+        [SerializeField] private float touchLead = 0.035f;
+        [SerializeField] private float sway = 0.025f;
         [SerializeField] private float maxBallSpeed = 14f;
         [SerializeField] private float speedWhileDribbling = 0.92f;
 
@@ -37,6 +33,7 @@ namespace PointPass.Players
         private float noPickupUntil;
         private bool waitingForSeparation;
         private float restoreCollisionAt;
+        private float touchWait;
         public bool AutomaticPickup { get; set; } = true;
 
         public bool HasBall => possession != null && possession.IsOwner(controller);
@@ -59,6 +56,7 @@ namespace PointPass.Players
         private void FixedUpdate()
         {
             if (ball == null || possession == null) return;
+            touchWait = Mathf.Max(0, touchWait - Time.fixedDeltaTime);
 
             if (waitingForSeparation && (Time.time >= restoreCollisionAt
                 || ownCollider.Distance(ball.Collider).distance > 0.02f)) RestoreCollision();
@@ -101,6 +99,12 @@ namespace PointPass.Players
             Physics2D.IgnoreCollision(ownCollider, ball.Collider, true);
         }
 
+        public void Dispossess(float recoverySeconds)
+        {
+            Release();
+            noPickupUntil = Time.time + Mathf.Max(.05f, recoverySeconds);
+        }
+
         private void RestoreCollision()
         {
             if (ball != null && ownCollider != null) Physics2D.IgnoreCollision(ownCollider, ball.Collider, false);
@@ -116,7 +120,9 @@ namespace PointPass.Players
             Vector2 ballPosition = ball.Body.position;
             Vector2 toBall = ballPosition - body.position;
 
-            if (Vector2.Distance(ballPosition, FeetTarget()) > acquireRadius) return;
+            // The player's actual contact envelope must reach the ball, rather than a large
+            // acquisition sphere ahead of the player sucking it towards a tracking point.
+            if (toBall.sqrMagnitude > .75f * .75f || Vector2.Distance(ballPosition, FeetTarget()) > acquireRadius) return;
             if (toBall.sqrMagnitude > 0.0001f && Vector2.Dot(toBall.normalized, Facing()) < 0.1f) return; // must be in front
             float receiveLimit = ball.LastKickWasPass ? 22f : maxPickupSpeed;
             if ((ball.Body.linearVelocity - body.linearVelocity).magnitude > receiveLimit) return;
@@ -126,6 +132,8 @@ namespace PointPass.Players
             carrying = true;
             ball.RecordTouch(controller);
             ball.SetCurve(0f);
+            ball.Body.linearVelocity = Vector2.Lerp(ball.Body.linearVelocity, body.linearVelocity, .78f);
+            touchWait = 0;
             Physics2D.IgnoreCollision(ownCollider, ball.Collider, true);
             movement.SpeedMultiplier = speedWhileDribbling;
         }
@@ -133,14 +141,26 @@ namespace PointPass.Players
         private void Carry()
         {
             Vector2 error = FeetTarget() - ball.Body.position;
-            if (error.magnitude > releaseRadius)
+            Vector2 toBall = ball.Body.position - body.position;
+            float forward = Vector2.Dot(toBall.normalized, Facing());
+            float leash = movement.IsSprinting ? releaseRadius + .16f : releaseRadius;
+            if (error.sqrMagnitude > leash * leash || forward < -.12f)
             {
                 Release();
                 return;
             }
 
-            Vector2 desired = body.linearVelocity + error * followGain;
-            ball.Body.linearVelocity = Vector2.ClampMagnitude(desired, maxBallSpeed);
+            if (touchWait > 0 || toBall.sqrMagnitude > .80f * .80f || forward < .15f) return;
+            touchWait = movement.IsSprinting ? .12f : .16f;
+            Vector2 facing = Facing();
+            Vector2 right = new Vector2(facing.y, -facing.x);
+            // A small push and limited lateral foot correction. There is no continuous
+            // positional spring pulling an escaping ball backwards around a sharp turn.
+            float push = body.linearVelocity.sqrMagnitude > .05f ? (movement.IsSprinting ? 1.45f : .65f) : 0;
+            Vector2 desired = body.linearVelocity + facing * push
+                + right * Mathf.Clamp(Vector2.Dot(error,right)*3f,-.65f,.65f);
+            Vector2 impulse = Vector2.ClampMagnitude(desired - ball.Body.linearVelocity, 4.2f);
+            ball.Body.linearVelocity = Vector2.ClampMagnitude(ball.Body.linearVelocity + impulse, maxBallSpeed);
         }
 
         private void StopCarrying()
@@ -161,7 +181,7 @@ namespace PointPass.Players
             float intensity = animator != null ? animator.Intensity : 0f;
 
             // Push peaks each time a boot is furthest forward (twice per stride cycle).
-            float lead = baseLead + touchLead * intensity * -Mathf.Cos(2f * phase);
+            float lead = baseLead + (movement.IsSprinting ? .09f : 0) + touchLead * intensity * -Mathf.Cos(2f * phase);
             float side = -sway * intensity * Mathf.Sin(phase);
 
             Vector2 forward = Facing();

@@ -52,7 +52,8 @@ namespace PointPass.Gameplay
             if (!IsActive || seconds<=0) return;
             age+=seconds;
             if (age>=2.9f) { Clear(); return; }
-            for (int i=0;i<PieceCount;i++)
+            int visiblePieces=Application.isMobilePlatform?48:PieceCount;
+            for (int i=0;i<visiblePieces;i++)
             {
                 float t=Mathf.Max(0,age-Hash(i,1)*0.25f);
                 float side=i%2==0 ? 1:-1;

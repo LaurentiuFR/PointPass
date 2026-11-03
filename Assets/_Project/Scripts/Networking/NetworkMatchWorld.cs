@@ -60,6 +60,7 @@ namespace PointPass.Networking
                 {
                     player.GetComponent<PlayerMovement>().enabled = false;
                     player.GetComponent<PlayerKicker>().enabled = false;
+                    player.GetComponent<PlayerTackler>().enabled = false;
                     player.Dribbler.enabled = false;
                     player.Body.simulated = false;
                     player.Body.interpolation = RigidbodyInterpolation2D.None;
@@ -102,7 +103,11 @@ namespace PointPass.Networking
                 Velocity = player.Body.simulated ? player.Body.linearVelocity : Vector2.zero,
                 Angle = player.Body.rotation, Charge = player.KickCharge, Charging = player.ChargingKick,
                 Curve = player.ShotCurve, KickSerial = kickSerials[slot], LastKick = lastKicks[slot],
-                Celebrating = player.GetComponent<PlayerAnimator>().IsCelebrating
+                Celebrating = player.GetComponent<PlayerAnimator>().IsCelebrating,
+                Stamina = player.Stamina.Remaining, Exhausted = player.Stamina.Exhausted,
+                Sprinting = player.Stamina.IsSprinting, TackleSerial = player.Tackler.ResultSerial,
+                TackleResult = player.Tackler.LastResult, TackleRecovery = player.Tackler.RecoveryRemaining,
+                Tackling = player.Tackler.IsChallenging
             };
         }
 
@@ -154,6 +159,8 @@ namespace PointPass.Networking
         {
             PlayerController player = Players[slot];
             SetPose(player.Body, state.Position, state.Angle);
+            player.Stamina.SetReplicated(state.Stamina,state.Exhausted,state.Sprinting);
+            player.Tackler.SetReplicated(state.TackleSerial,state.TackleResult,state.TackleRecovery,state.Tackling);
             PlayerAnimator animator = player.GetComponent<PlayerAnimator>();
             animator.SetReplicatedMotion(state.Velocity);
             if (kickSerials[slot] != state.KickSerial)

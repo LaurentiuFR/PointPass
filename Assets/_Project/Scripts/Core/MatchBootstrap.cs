@@ -130,6 +130,7 @@ namespace PointPass.Core
             CircleCollider2D collider = go.AddComponent<CircleCollider2D>();
             collider.radius = MatchConfig.PlayerColliderRadius;
 
+            go.AddComponent<PlayerStamina>();
             go.AddComponent<PlayerMovement>();
             PlayerController controller = go.AddComponent<PlayerController>();
             controller.Init(team, kickoffPosition, kickoffAngle);
@@ -160,6 +161,8 @@ namespace PointPass.Core
             PlayerKicker kicker = go.AddComponent<PlayerKicker>();
             kicker.Init(ball, possession);
             kicker.Kicked += animator.PlayKick;
+            go.AddComponent<PlayerTackler>().Init(ball, possession);
+            go.AddComponent<TackleFeedback>();
             go.AddComponent<StadiumActorLighting>().Init(root);
             return controller;
         }

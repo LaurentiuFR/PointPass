@@ -11,6 +11,7 @@ namespace PointPass.Networking
         private NetworkInputCommand command;
         private NetworkPlayerState state;
         private bool cancellationSent;
+        private float nextTackleAt;
         public bool IsActive { get; set; }
         public float KickCharge => state.Charge;
         public PlayerKicker.KickType ChargingKick => state.Charging;
@@ -47,6 +48,13 @@ namespace PointPass.Networking
             Send(NetworkKickAction.Cancel);
         }
         public void SendState() => Send(NetworkKickAction.None);
+        public bool RequestTackle()
+        {
+            if (!IsActive || controller.Dribbler.HasBall || Time.unscaledTime < nextTackleAt
+                || (controller.Tackler != null && !controller.Tackler.CanAct)) return false;
+            nextTackleAt = Time.unscaledTime + .25f;
+            Send(NetworkKickAction.Tackle); return true;
+        }
 
         private void Send(NetworkKickAction action)
         {

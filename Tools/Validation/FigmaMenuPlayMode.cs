@@ -121,7 +121,7 @@ namespace PointPass.Validation
                 await Click("MatchFormat3"); Check(menu.Lobby.ModalOpen && menu.Lobby.SquadSize == 3, "Multiplayer preview preserves selected format");
                 menu.Lobby.CloseModal(); menu.ShowMain();
                 await Click("HowToPlay");
-                for (int i = 0; i < 4; i++) await Click("GuideNext");
+                for (int i = 0; i < 5; i++) await Click("GuideNext");
                 await Capture("guide-practice-link");
                 await Click("GuideNext"); await Task.Delay(180);
                 Check(!menu.IsOpen, "Guide practice action launches actual practice");

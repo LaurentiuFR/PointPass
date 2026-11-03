@@ -16,13 +16,22 @@ namespace PointPass.Networking
         public uint KickSerial;
         public PlayerKicker.KickType LastKick;
         public bool Celebrating;
+        public float Stamina;
+        public bool Exhausted;
+        public bool Sprinting;
+        public uint TackleSerial;
+        public TackleResult TackleResult;
+        public float TackleRecovery;
+        public bool Tackling;
 
         public static NetworkPlayerState Blend(NetworkPlayerState a, NetworkPlayerState b, float t)
         {
-            b.Position = Vector2.Lerp(a.Position, b.Position, t);
-            b.Velocity = Vector2.Lerp(a.Velocity, b.Velocity, t);
-            b.Angle = Mathf.LerpAngle(a.Angle, b.Angle, t);
-            return b;
+            NetworkPlayerState result = t < 1f ? a : b;
+            result.Position = Vector2.Lerp(a.Position, b.Position, t);
+            result.Velocity = Vector2.Lerp(a.Velocity, b.Velocity, t);
+            result.Angle = Mathf.LerpAngle(a.Angle, b.Angle, t);
+            result.Stamina = Mathf.Lerp(a.Stamina,b.Stamina,t);
+            return result;
         }
     }
 }

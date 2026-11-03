@@ -9,7 +9,7 @@ using UnityEngine.UI;
 namespace PointPass.UI
 {
     /// <summary>Runtime match presentation. Gameplay and input remain in their own components.</summary>
-    public class MatchHud : MonoBehaviour
+    public partial class MatchHud : MonoBehaviour
     {
         private static Color Ink => MatchPalette.Ink;
         private static Color Paper => MatchPalette.Paper;
@@ -89,6 +89,7 @@ namespace PointPass.UI
             hud.BuildControlHint();
             hud.BuildBanner();
             hud.BuildPauseButton();
+            hud.BuildAthleticsAndLayout();
             hud.replayCue=hud.Panel(hud.safeAreaRoot,"GoalReplayCue",Ink,new Vector2(0,-185),new Vector2(490,54));
             hud.replayCue.rectTransform.anchorMin=hud.replayCue.rectTransform.anchorMax=new Vector2(0.5f,1);
             Label(hud.replayCue.transform,"ReplayStatus","",19,Vector2.zero,new Vector2(470,46),Mint,true);
@@ -108,6 +109,7 @@ namespace PointPass.UI
 
         private void Update()
         {
+            UpdateAthletics();
             if (Screen.safeArea != lastSafeArea || Screen.width != lastScreenSize.x
                 || Screen.height != lastScreenSize.y) ApplySafeArea();
 
@@ -258,7 +260,7 @@ namespace PointPass.UI
         {
             PassButton = BuildAction("Pass", new Vector2(-338, 170), 168, Mint, 0, out passCharge);
             ShootButton = BuildAction("Shoot", new Vector2(-158, 314), 184, Mint, 1, out shotCharge);
-            SprintButton = BuildAction("Sprint", new Vector2(-132, 108), 140, Paper, 2, out _);
+            SprintButton = BuildAction("Sprint", new Vector2(-132, 108), 140, Paper, 2, out staminaRing);
             // Only opacity changes. Touch ownership and release/cancel events remain intact.
             passAvailability = PassButton.gameObject.AddComponent<CanvasGroup>();
             shotAvailability = ShootButton.gameObject.AddComponent<CanvasGroup>();
@@ -271,13 +273,13 @@ namespace PointPass.UI
             chargeFill.type = UnityEngine.UI.Image.Type.Filled;
             chargeFill.fillMethod = UnityEngine.UI.Image.FillMethod.Horizontal;
             chargeFill.fillOrigin = 0;
-            Image cancel = Panel(safeAreaRoot, "CancelCharge", Ink, Vector2.zero, new Vector2(132, 56));
-            Place(cancel.rectTransform, new Vector2(1, 0), new Vector2(-462, 444), new Vector2(132, 56));
+            Image cancel = Panel(safeAreaRoot, "CancelCharge", Ink, Vector2.zero, new Vector2(148, 124));
+            Place(cancel.rectTransform, new Vector2(1, 0), new Vector2(-462, 444), new Vector2(148, 124));
             cancel.raycastTarget = true;
             CancelChargeButton = cancel.gameObject.AddComponent<Button>();
             CancelChargeButton.targetGraphic = cancel;
             CancelChargeButton.navigation = new Navigation { mode = Navigation.Mode.None };
-            Label(cancel.transform, "Label", "CANCEL", 20, Vector2.zero, new Vector2(124, 42), Paper, true);
+            Label(cancel.transform, "Label", "CANCEL", 24, Vector2.zero, new Vector2(140, 48), Paper, true);
             CancelChargeButton.onClick.AddListener(() =>
             {
                 if (isActiveAndEnabled && CancelChargeButton.gameObject.activeInHierarchy) CancelChargeRequested?.Invoke();
@@ -311,11 +313,11 @@ namespace PointPass.UI
 
             controlHint.color = hasBall ? Mint : Muted;
             if (Application.isMobilePlatform)
-                controlHint.text = hasBall ? "HOLD TO CHARGE  /  FLICK FROM SHOOT TO BEND" : "COLLECT THE BALL  /  SPRINT TO GET THERE";
+                controlHint.text = hasBall ? "HOLD TO CHARGE  /  FLICK FROM SHOOT TO BEND" : "MOVE INTO CONTACT  /  TACKLE TO WIN THE BALL";
             else if (usingGamepad)
-                controlHint.text = hasBall ? "HOLD SOUTH: PASS  /  EAST: SHOOT  /  RIGHT STICK: BEND" : "COLLECT THE BALL  /  RB: SPRINT";
+                controlHint.text = hasBall ? "HOLD SOUTH: PASS  /  EAST: SHOOT  /  RIGHT STICK: BEND" : "WEST: TACKLE  /  RB: SPRINT";
             else
-                controlHint.text = hasBall ? "HOLD J: PASS  /  K: SHOOT  /  Q-E: BEND  /  ESC: CANCEL" : "COLLECT THE BALL  /  SHIFT: SPRINT";
+                controlHint.text = hasBall ? "HOLD J: PASS  /  K: SHOOT  /  Q-E: BEND  /  ESC: CANCEL" : "L: TACKLE  /  SHIFT: SPRINT";
         }
 
         private HoldActionButton BuildAction(string name, Vector2 position, float diameter, Color accent, int icon, out Image charge)

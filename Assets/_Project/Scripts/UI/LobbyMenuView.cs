@@ -89,17 +89,17 @@ namespace PointPass.UI
             ClearDialog();
             modalContent.sizeDelta = new Vector2(1320, 720);
             ((RectTransform)modalContent.Find("DialogPlate")).sizeDelta = modalContent.sizeDelta;
-            string[] headings = { "MOVE & DRIBBLE", "PASS", "SHOOT & CURVE", "SPRINT", "CANCEL A KICK" };
-            string[] instructions = { "Use the left joystick to move and guide the ball.", "Hold PASS to charge. Aim with your movement direction, then release.", "Hold SHOOT for power. Flick sideways as you release to bend the shot.", "Hold SPRINT while moving.", "Tap CANCEL while charging to stop the kick." };
-            string[] captions = { "LEFT JOYSTICK", "HOLD → RELEASE", "FLICK SIDEWAYS", "HOLD SPRINT", "TAP CANCEL" };
+            string[] headings = { "MOVE & DRIBBLE", "PASS", "SHOOT & CURVE", "SPRINT & STAMINA", "WIN THE BALL", "CANCEL A KICK" };
+            string[] instructions = { "Use the left joystick to move. Collect the ball at your feet and guide it with small touches.", "Hold PASS to charge. Aim with your movement direction, then release.", "Hold SHOOT for power. Flick sideways as you release to bend the shot.", "Hold SPRINT while moving. The ring shows your stamina. Release sprint to recover after it runs out.", "Face the exposed ball and tap TACKLE at close range. A miss needs time to recover. Keyboard: L. Controller: West.", "Tap CANCEL while charging to stop the kick. Customise touch controls in Settings or with the HUD gear." };
+            string[] captions = { "LEFT JOYSTICK", "HOLD → RELEASE", "FLICK SIDEWAYS", "WATCH THE SPRINT RING", "TIME YOUR TACKLE", "TAP CANCEL" };
             Text(modalContent, "GuideBrand", "POINTPASS", 29, new Vector2(-480, 290), new Vector2(270, 50), Aqua, true);
-            Text(modalContent, "GuideStep", (guideStep + 1) + " / 05", 25, new Vector2(535, 290), new Vector2(150, 50), Dim, true);
+            Text(modalContent, "GuideStep", (guideStep + 1) + " / 06", 25, new Vector2(535, 290), new Vector2(150, 50), Dim, true);
             Icon(modalContent, "ControlVisual", guideStep == 0 ? LobbyIcon.Symbol.Target : guideStep == 4 ? LobbyIcon.Symbol.Plus : LobbyIcon.Symbol.Arrow, new Vector2(-360, 30), 180, Aqua);
             Text(modalContent, "ControlCaption", captions[guideStep], 27, new Vector2(-360, -130), new Vector2(470, 55), Aqua, true);
             Text(modalContent, "GuideHeading", headings[guideStep], 46, new Vector2(260, 130), new Vector2(680, 85), null, true, TextAnchor.MiddleLeft);
             Text(modalContent, "GuideInstruction", instructions[guideStep], 35, new Vector2(260, -4), new Vector2(680, 150), null, false, TextAnchor.UpperLeft);
             var back = Button(modalContent, "GuidePrevious", guideStep == 0 ? "BACK TO LOBBY" : "PREVIOUS", new Vector2(-422, -262), new Vector2(360, 96), () => { if (guideStep == 0) CloseModal(); else { guideStep--; BuildGuide(); } });
-            var next = Button(modalContent, "GuideNext", guideStep == 4 ? "TRY PASSING PRACTICE" : "NEXT", new Vector2(355, -262), new Vector2(500, 96), () => { if (guideStep == 4) host.RequestPassingPractice(); else { guideStep++; BuildGuide(); } }, true);
+            var next = Button(modalContent, "GuideNext", guideStep == 5 ? "TRY PASSING PRACTICE" : "NEXT", new Vector2(355, -262), new Vector2(500, 96), () => { if (guideStep == 5) host.RequestPassingPractice(); else { guideStep++; BuildGuide(); } }, true);
             Text(modalContent, "GuidePrinciple", "One player. Every pass matters.", 23, new Vector2(0, -334), new Vector2(700, 34), Dim);
             Select(next);
         }
@@ -187,20 +187,21 @@ namespace PointPass.UI
             sound.gameObject.AddComponent<AudioSettingsView>().Build();
             var options = Panel(page, "Options", new Vector2(575, -90), new Vector2(540, 610));
             Icon(options.transform, "SettingsIcon", LobbyIcon.Symbol.Gear, new Vector2(0, 186), 64);
-            Text(options.transform, "Title", "MAKE IT YOUR GAME", 25, new Vector2(0, 100), new Vector2(490, 60), null, true);
-            Button(options.transform, "HowToPlay", "HOW TO PLAY", new Vector2(0, 6), new Vector2(440, 64), () => host.RequestControls());
+            Text(options.transform, "Title", "MAKE IT YOUR GAME", 25, new Vector2(0, 124), new Vector2(490, 60), null, true);
+            Button(options.transform, "HowToPlay", "HOW TO PLAY", new Vector2(0, 38), new Vector2(440, 64), () => host.RequestControls());
+            Button(options.transform, "MobileControlLayout", "TOUCH CONTROL LAYOUT", new Vector2(0, -43), new Vector2(440,64), MobileControlEditor.Open);
             UnityEngine.UI.Button colours = null;
             colours = Button(options.transform, "ColourScheme", "COLOURS: " + MatchPalette.ThemeName,
-                new Vector2(0, -75), new Vector2(440, 64), () =>
+                new Vector2(0, -124), new Vector2(440, 64), () =>
                 {
                     MatchPalette.SetTheme((MatchPalette.InterfaceTheme)(((int)MatchPalette.Theme + 1) % 3));
                     colours.GetComponentInChildren<UnityEngine.UI.Text>().text = "COLOURS: " + MatchPalette.ThemeName;
                 });
-            Button(options.transform, "ResetDemoWallet", "RESET PREVIEW WALLET", new Vector2(0, -156), new Vector2(440, 64),
+            Button(options.transform, "ResetDemoWallet", "RESET PREVIEW WALLET", new Vector2(0, -205), new Vector2(440, 64),
                 () => OpenDialog("RESET PREVIEW WALLET", "Restore 10,000 gold coins and 250 pass points? This also clears locally owned preview items.",
                     "RESET WALLET", () => { Profile.ResetDemoWallet(); CloseModal(); }));
             Text(options.transform, "SavedHint", "Sound and preview purchases are saved\non this device. No account required.", 17,
-                new Vector2(0, -250), new Vector2(460, 70), Dim);
+                new Vector2(0, -278), new Vector2(460, 44), Dim);
         }
 
         private void BuildModal()

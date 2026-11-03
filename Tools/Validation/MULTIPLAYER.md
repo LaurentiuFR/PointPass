@@ -29,7 +29,7 @@ From the repository root, launch these two interactive windows:
 
 Alternatively launch both with `--pp-network`, then select **Host** in one and **Join** in the other, using `127.0.0.1` and matching ports. The first player is blue; the joining player is red. The match begins after both have connected. Each window has exactly one local input owner. Keyboard input follows the focused window; switching windows cancels the departing window's held actions without pausing the match. Touch/pointer joystick and action buttons retain their existing controller path.
 
-Controls remain WASD/arrows, Shift sprint, J charged pass, K charged shot, Q/E bend during a shot, and Escape to cancel a charge. The mobile shooting flick uses the same input/controller route. The development **Restart match (host)** button resets both peers. The HUD pause button cancels local actions; an individual player cannot freeze the shared match.
+Controls: WASD/arrows move, Shift sprints using stamina, L tackles, J charges a pass, K charges a shot, Q/E bends a shot, and Escape cancels a charge. Gamepad: left stick moves, RB sprints, West tackles, South passes, East shoots, right stick bends and North cancels. Touch uses the same command route. The HUD gear and Settings open the saved control-layout editor. The development **Restart match (host)** button resets both peers. The HUD pause button cancels local actions; an individual player cannot freeze the shared match.
 
 Use **Disconnect** to leave. Client departure abandons the current match and leaves the host listening for another player. Joining again creates a clean match. Host departure ends the client match. Both can then host/join again without restarting the application.
 
@@ -70,14 +70,14 @@ Reports, player logs, CSV snapshots and screenshots go to `Logs/NetworkVerificat
 - The host simulates all three dynamic bodies. Client rigidbodies and colliders do not simulate; movement, dribbling, ball physics and kicking components are disabled there. Received state controls presentation and possession feedback.
 - Commands use reliable sequenced NGO named messages, with movement/sprint heartbeats at 30 Hz. Every command includes retained aim, so a direction tap shorter than a heartbeat still reaches the kicker after movement stops. Host snapshots use unreliable sequenced messages at up to 30 Hz. Clients interpolate approximately 100 ms behind the latest state, and snap cleanly across explicit reset versions. Animation velocity, kick events and ball roll follow replicated state.
 - Actors are spawned through the existing runtime factories, rather than network prefab instances. NGO manages the connection and custom messages; the server's fixed two-slot roster manages actor lifecycle and ownership. No prefab or scene edits are needed. NGO may generate an empty default prefab-list asset during import.
-- The connection payload checks the `PointPass-PC-3` compatibility identifier and `Application.version`. The menu integration changes shared passing speeds, damping and reception rules, so older `PC-2` players are rejected rather than mixing gameplay rules. The input/state message layouts remain version 2. Bump the message names when changing their layouts; distribute the same build to both players. This is a version check, not account authentication.
+- The connection payload checks `PointPass-PC-4` and `Application.version`. Tackle commands and replicated stamina/tackle fields use input/state message version 3. Older builds are rejected. Rebuild and distribute the same complete player folder to both players. This is a version check, not account authentication.
 
 The simulation rules can initialize without a HUD. A later dedicated-server milestone must also remove actor/world presentation creation and local-player composition; this milestone is a player-hosted match.
 
 ## Current limits
 
 - Network matches have two human players only, with one on each team. Offline goalkeeper AI and clubhouse preview squad slots are not created in the network world. No network team selection, public matchmaking, join codes, cloud setup or paid services.
-- No client prediction or reconciliation yet. Client controls and charge feedback include network delay and the presentation buffer. High-latency/loss tuning is a later LAN/internet validation step.
+- No client prediction or reconciliation yet. Client controls and charge feedback include network delay and the presentation buffer. Automated loopback impairment has been checked; second-PC LAN/internet feel still needs hands-on validation.
 - Offline highlights/practice remain offline; network goal replay is not implemented. Client presentation reproduces goals, player animations and crowd reactions, but physical net-impact ripple events are not yet replicated.
 - The host listens on IPv4 UDP; this milestone is verified on loopback. Second-PC Wi-Fi and physical iPhone testing are separate milestones. No router forwarding is needed for a later LAN test. Do not disable Windows Firewall; if LAN access needs a rule, limit it to the test executable, selected UDP port, Private profile and local subnet.
 - The clubhouse main menu is integrated with offline gameplay. Its online match-format controls remain labelled previews; actual multiplayer still uses the separate temporary development panel and launch arguments above.
@@ -93,8 +93,19 @@ Completed on **3 November 2026**, on Windows, from `codex/authoritative-multipla
 - Host and client logs contained no runtime exceptions. Direct camera captures from each process were inspected for the full pitch, stadium, players, ball, goals and UI. These captures deliberately render offscreen because a hidden Windows player may return a black desktop screenshot.
 - The **371** existing offline engine checks passed again after the final controller change. The **30** existing offline Play Mode checks passed, including default main-menu startup, pause/resume, goal physics and golden goal.
 
-The final report for each run is `Logs/NetworkVerification/TwoPlayers/tests.txt`; captures are `host.png` and `client.png` in the same directory. Read the report together with player logs and matching snapshot sequences. Automated local controller commands establish network simulation behavior; physical keyboard/gamepad feel and real mobile multitouch still require hands-on testing. Latency/loss, a second PC, iPhones and internet sessions have not been validated in this milestone.
+The final report for each run is `Logs/NetworkVerification/TwoPlayers/tests.txt`; captures are `host.png` and `client.png` in the same directory. Read the report together with player logs and matching snapshot sequences. Automated local controller commands establish network simulation behavior; physical keyboard/gamepad feel and real mobile multitouch still require hands-on testing. The later tackling/mobile validation below adds controlled latency/loss checks. A second PC, iPhones and internet sessions remain untested.
 
 The expanded suite also exercises Red through the real `HumanPlayerInput` keyboard and HUD button handlers: an immediate touch-shot press/release before a snapshot acknowledgement, a held keyboard shot, and a touch pass. It checks live FPS/ping/jitter, transport packet counters, bandwidth and snapshot rate, plus known sequence-gap/reordering/wrap/reset cases. These synthetic input events run in two standalone players; physical keyboard/controller and touchscreen playtests remain useful. The earlier controller-only tests missed the delayed-release-source bug reported during manual playtesting.
 
 The client-input/diagnostics follow-up passed on **3 November 2026** with **916** matching snapshots. Its report and reviewed screenshots are in `Logs/NetworkVerification/InputAndDiagnostics`. The shared-input change also passed all **371** offline engine checks and **30** offline Play Mode checks. The hidden-player harness explicitly enables synthetic keyboard input in the background; ordinary game windows retain their existing focus behavior.
+
+## Tackling, stamina and mobile controls
+
+See [PLAYER_FEATURES.md](PLAYER_FEATURES.md) for tuning, mobile controls, current test evidence and device limitations. The host now also resolves tackles and sprint budgets. Client presentation interpolates continuous positions/stamina while preserving a snapshot's discrete possession and tackle events until their presentation time.
+
+```powershell
+.\Tools\Validation\Test-TacklingStaminaMultiplayer.ps1 -Port 7787
+.\Tools\Validation\Test-TacklingStaminaMultiplayer.ps1 -Port 7797 -LatencyMs 70 -ReportDirectory C:/Dev/PointPass/Logs/PlayerFeatures/Multiplayer-Impaired
+```
+
+The second command uses a localhost UDP proxy with 70 ms delay per leg, ±15 ms jitter and 1% configured packet loss. Each client endpoint has an independent upstream endpoint so reconnects behave like separate real UDP connections. It changes neither game authority nor system network/firewall settings. Both commands launch two real Windows development players and clean them up afterward.

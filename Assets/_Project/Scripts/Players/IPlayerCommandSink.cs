@@ -15,5 +15,6 @@ namespace PointPass.Players
         void ReleaseKick(PlayerKicker.KickType type);
         void CancelKick();
         void SetShotCurve(float curve);
+        bool RequestTackle();
     }
 }

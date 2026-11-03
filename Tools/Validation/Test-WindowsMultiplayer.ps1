@@ -21,13 +21,21 @@ function Send-Command([string]$Role, [string]$Action, [hashtable]$Values = @{}) 
     do {
         try {
             [IO.File]::Move($temporary, (Join-Path $reportRoot "$Role-command.json"), $true)
-            return
+            break
         }
         catch {
             if ((Get-Date) -ge $deadline) { throw }
             Start-Sleep -Milliseconds 20
         }
     } while ($true)
+    if ($Action -ne 'quit') {
+        $deadline = (Get-Date).AddSeconds(5)
+        do {
+            if ((Read-State $Role).appliedCommand -ge $sequences[$Role]) { return }
+            Start-Sleep -Milliseconds 30
+        } while ((Get-Date) -lt $deadline)
+        throw "Command $Action was not applied by $Role"
+    }
 }
 function Read-State([string]$Role) {
     for ($attempt = 0; $attempt -lt 8; $attempt++) {
@@ -107,15 +115,19 @@ try {
         $walkStart = (Read-State host).$team.x
         Send-Command $role move @{ x = $direction; y = 0; sprint = $false }
         Start-Sleep -Milliseconds 700
+        $velocity=(Read-State host).($team+'Velocity')
+        $walkSpeed=[Math]::Sqrt($velocity.x*$velocity.x+$velocity.y*$velocity.y)
         Send-Command $role move @{ x = 0; y = 0 }
         $walkDistance = [Math]::Abs((Read-State host).$team.x - $walkStart)
         Fixture @{ blueX = -5; blueY = -3; redX = 5; redY = 3; ballX = 0; ballY = 4 }
         $sprintStart = (Read-State host).$team.x
         Send-Command $role move @{ x = $direction; y = 0; sprint = $true }
         Start-Sleep -Milliseconds 700
+        $velocity=(Read-State host).($team+'Velocity')
+        $sprintSpeed=[Math]::Sqrt($velocity.x*$velocity.x+$velocity.y*$velocity.y)
         Send-Command $role move @{ x = 0; y = 0 }
         $sprintDistance = [Math]::Abs((Read-State host).$team.x - $sprintStart)
-        Check ($sprintDistance -gt $walkDistance * 1.18) "$role held sprint preserves its speed advantage"
+        Check ($walkSpeed -gt 4 -and $sprintSpeed -gt $walkSpeed * 1.18) "$role held sprint preserves its authoritative speed advantage"
     }
     Fixture @{ blueX = -2; blueY = 0; redX = 1.5; redY = 0; ballX = -1.35; ballY = 0 }
     Wait-For { (Read-State host).owner -eq 0 -and (Read-State client).owner -eq 0 } 'Both peers agree that blue possesses the ball'
@@ -163,11 +175,12 @@ try {
         Send-Command client humanOff
         Start-Sleep -Milliseconds 200
     }
-    Fixture @{ blueX = 5; blueY = 3; redX = 0; redY = 0; ballX = -0.65; ballY = 0 }
-    Wait-For { (Read-State host).owner -eq 1 } 'Client acquires ball for retained-aim test'
-    $redKicks = (Read-State host).redKicks
+    # Collect in the new facing direction: a sharp turn away from an already owned
+    # ball may now correctly release it instead of magnetically bringing it around.
+    Fixture @{ blueX = 5; blueY = 3; redX = 0; redY = 0; ballX = 0; ballY = 0.62 }
     Send-Command client aimTap @{ x = 0; y = 1 }
-    Start-Sleep -Milliseconds 120
+    Wait-For { (Read-State host).owner -eq 1 -and (Read-State client).owner -eq 1 } 'Both peers observe collection in the retained facing direction'
+    $redKicks = (Read-State host).redKicks
     Send-Command client shotDown
     Start-Sleep -Milliseconds 350
     Send-Command client shotUp @{ curve = 0 }

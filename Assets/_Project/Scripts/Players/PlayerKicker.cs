@@ -87,6 +87,7 @@ namespace PointPass.Players
         }
 
         private bool CanKick() => controller.IsActive && ball != null && ball.Body.simulated
+            && (controller.Tackler == null || controller.Tackler.CanAct)
             && possession != null && possession.IsOwner(controller);
 
         private void FixedUpdate()

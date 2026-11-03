@@ -13,9 +13,9 @@ namespace PointPass.Networking
     /// <summary>Connection lifecycle and transport only; gameplay executes in the authoritative world.</summary>
     public sealed class NetworkSession : MonoBehaviour
     {
-        private const string InputMessage = "PointPass/Input/2";
-        private const string StateMessage = "PointPass/State/2";
-        public const string Protocol = "PointPass-PC-3";
+        private const string InputMessage = "PointPass/Input/3";
+        private const string StateMessage = "PointPass/State/3";
+        public const string Protocol = "PointPass-PC-4";
         private const string ProbeMessage = "PointPass/Diagnostics/1";
         private NetworkManager manager;
         private UnityTransport transport;

@@ -6,7 +6,7 @@ namespace PointPass.Players
     /// Moves a footballer with momentum. It knows nothing about who is controlling him:
     /// it just executes the direction it is given through SetMoveInput.
     /// </summary>
-    [RequireComponent(typeof(Rigidbody2D))]
+    [RequireComponent(typeof(Rigidbody2D), typeof(PlayerStamina))]
     public class PlayerMovement : MonoBehaviour
     {
         [Header("Movement")]
@@ -22,6 +22,10 @@ namespace PointPass.Players
         private bool hasAim;
         private bool sprinting;
         private Vector2 velocityChange;
+        private PlayerStamina stamina;
+        public PlayerStamina Stamina => stamina != null ? stamina : (stamina = GetComponent<PlayerStamina>());
+        public float ActionSpeedMultiplier { get; set; } = 1f;
+        public bool IsSprinting => Stamina != null && Stamina.IsSprinting;
 
         public void SetSprint(bool held) => sprinting = held;
         public void SetAimDirection(Vector2 direction)
@@ -60,6 +64,8 @@ namespace PointPass.Players
             moveInput = Vector2.zero;
             hasAim = false;
             sprinting = false;
+            Stamina?.ResetBudget();
+            ActionSpeedMultiplier = 1f;
             velocityChange = Vector2.zero;
         }
 
@@ -67,7 +73,8 @@ namespace PointPass.Players
         {
             if (!Body.simulated) return;
 
-            float topSpeed = maxSpeed * SpeedMultiplier * (sprinting ? sprintMultiplier : 1f);
+            Stamina?.Step(sprinting, moveInput.sqrMagnitude > .04f && ActionSpeedMultiplier >= .99f, Time.fixedDeltaTime);
+            float topSpeed = maxSpeed * SpeedMultiplier * ActionSpeedMultiplier * (IsSprinting ? sprintMultiplier : 1f);
             Vector2 targetVelocity = moveInput * topSpeed;
             bool hasInput = moveInput.sqrMagnitude > 0.01f;
             // Smooth acceleration itself so steering keeps a short, controllable arc rather

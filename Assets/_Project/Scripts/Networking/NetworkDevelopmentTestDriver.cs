@@ -7,6 +7,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.LowLevel;
+using Unity.Profiling;
 
 namespace PointPass.Networking
 {
@@ -54,6 +55,7 @@ namespace PointPass.Networking
             public Vector2 red;
             public Vector2 ball;
             public Vector2 ballVelocity;
+            public Vector2 blueVelocity,redVelocity;
             public float ballCurve;
             public int charging;
             public float charge;
@@ -71,6 +73,13 @@ namespace PointPass.Networking
             public ulong packetsReceived;
             public float snapshotHz;
             public bool diagnosticsSelfCheck;
+            public float blueStamina,redStamina,blueRecovery,redRecovery;
+            public bool blueExhausted,redExhausted;
+            public uint blueTackles,redTackles;
+            public int blueTackleResult,redTackleResult;
+            public int profileFrames;
+            public float averageFrameMs,peakFrameMs,peakMainThreadMs;
+            public long peakGcBytes;
         }
 
         private NetworkSession session;
@@ -85,6 +94,10 @@ namespace PointPass.Networking
         private bool previousBackground;
         private HumanPlayerInput humanInput;
         private bool diagnosticsSelfCheck;
+        private ProfilerRecorder mainThreadRecorder,gcRecorder;
+        private int profileFrames;
+        private float sumFrameMs,peakFrameMs,peakMainThreadMs;
+        private long peakGcBytes;
         private readonly CultureInfo invariant = CultureInfo.InvariantCulture;
 
         public void Init(NetworkSession value)
@@ -99,8 +112,10 @@ namespace PointPass.Networking
             Directory.CreateDirectory(directory);
             role = NetworkDevelopmentBootstrap.Argument("--pp-test-role", "player");
             snapshots = new StreamWriter(Path.Combine(directory, role + "-snapshots.csv"), false) { AutoFlush = true };
-            snapshots.WriteLine("sequence,reset,blueScore,redScore,clock,owner,ballX,ballY,ballVx,ballVy,blueX,blueY,redX,redY,blueKicks,redKicks,curve");
+            snapshots.WriteLine("sequence,reset,blueScore,redScore,clock,owner,ballX,ballY,ballVx,ballVy,blueX,blueY,redX,redY,blueKicks,redKicks,curve,blueStamina,redStamina,blueExhausted,redExhausted,blueTackles,redTackles,blueTackleResult,redTackleResult");
             session.StateReceived += Record;
+            mainThreadRecorder=ProfilerRecorder.StartNew(ProfilerCategory.Internal,"Main Thread",16);
+            gcRecorder=ProfilerRecorder.StartNew(ProfilerCategory.Memory,"GC Allocated In Frame",16);
         }
 
         private void Record(NetworkMatchState state)
@@ -111,11 +126,17 @@ namespace PointPass.Networking
                 state.BallVelocity.x.ToString("R", invariant), state.BallVelocity.y.ToString("R", invariant),
                 state.Blue.Position.x.ToString("R", invariant), state.Blue.Position.y.ToString("R", invariant),
                 state.Red.Position.x.ToString("R", invariant), state.Red.Position.y.ToString("R", invariant),
-                state.Blue.KickSerial, state.Red.KickSerial, state.BallCurve.ToString("R", invariant)));
+                state.Blue.KickSerial, state.Red.KickSerial, state.BallCurve.ToString("R", invariant),
+                state.Blue.Stamina.ToString("R",invariant),state.Red.Stamina.ToString("R",invariant),state.Blue.Exhausted,state.Red.Exhausted,
+                state.Blue.TackleSerial,state.Red.TackleSerial,(int)state.Blue.TackleResult,(int)state.Red.TackleResult));
         }
 
         private void Update()
         {
+            float frameMs=Time.unscaledDeltaTime*1000;profileFrames++;sumFrameMs+=frameMs;
+            peakFrameMs=Mathf.Max(peakFrameMs,frameMs);
+            if(mainThreadRecorder.Valid)peakMainThreadMs=Mathf.Max(peakMainThreadMs,mainThreadRecorder.LastValue/1000000f);
+            if(gcRecorder.Valid)peakGcBytes=Math.Max(peakGcBytes,gcRecorder.LastValue);
             if (Time.unscaledTime < nextPoll) return;
             nextPoll = Time.unscaledTime + 0.05f;
             string path = Path.Combine(directory, role + "-command.json");
@@ -134,11 +155,11 @@ namespace PointPass.Networking
             if (session.World != null)
             {
                 PlayerController local = session.World.Players[session.IsHost ? 0 : 1];
-                local.SetMove(move);
-                local.SetSprint(sprint);
-                local.SetShotCurve(curve);
+                if(humanInput==null)
+                { local.SetMove(move); local.SetSprint(sprint); local.SetShotCurve(curve); }
                 session.World.Hud.SetPlayerState(local.IsActive, local.Dribbler.HasBall, false);
                 session.World.Hud.SetCharge(local.ChargingKick, local.KickCharge, local.ShotCurve);
+                session.World.Hud.SetAthleticState(local.Stamina,local.Tackler);
             }
             NetworkMatchState state = session.LatestState;
             Report report = new Report
@@ -150,8 +171,16 @@ namespace PointPass.Networking
                 redScore = state.RedScore, playing = state.Playing, clock = state.Clock, owner = state.OwnerSlot,
                 blue = state.Blue.Position, red = state.Red.Position, ball = state.BallPosition,
                 ballVelocity = state.BallVelocity, ballCurve = state.BallCurve,
+                blueVelocity=state.Blue.Velocity,redVelocity=state.Red.Velocity,
                 charging = (int)state.Red.Charging, charge = state.Red.Charge,
-                blueKicks = state.Blue.KickSerial, redKicks = state.Red.KickSerial
+                blueKicks = state.Blue.KickSerial, redKicks = state.Red.KickSerial,
+                blueStamina=state.Blue.Stamina,redStamina=state.Red.Stamina,
+                blueExhausted=state.Blue.Exhausted,redExhausted=state.Red.Exhausted,
+                blueRecovery=state.Blue.TackleRecovery,redRecovery=state.Red.TackleRecovery,
+                blueTackles=state.Blue.TackleSerial,redTackles=state.Red.TackleSerial,
+                blueTackleResult=(int)state.Blue.TackleResult,redTackleResult=(int)state.Red.TackleResult,
+                profileFrames=profileFrames,averageFrameMs=profileFrames>0?sumFrameMs/profileFrames:0,
+                peakFrameMs=peakFrameMs,peakMainThreadMs=peakMainThreadMs,peakGcBytes=peakGcBytes
             };
             NetworkDiagnostics metrics = session.Diagnostics;
             report.metricsConnected = metrics.HasPeer;
@@ -182,6 +211,7 @@ namespace PointPass.Networking
 
         private void Apply(Command command)
         {
+            if(command.action=="resetProfile") {profileFrames=0;sumFrameMs=peakFrameMs=peakMainThreadMs=0;peakGcBytes=0;return;}
             if (command.action == "quit") { session.Disconnect(); Application.Quit(); return; }
             if (command.action == "disconnect") { session.Disconnect(); return; }
             if (command.action == "host") { session.Host((ushort)command.slot); return; }
@@ -208,6 +238,8 @@ namespace PointPass.Networking
             NetworkMatchWorld world = session.World;
             if (world == null) return;
             PlayerController player = world.Players[session.IsHost ? 0 : 1];
+            if(command.action=="tackle") {player.RequestTackle();return;}
+            if(command.action=="tackleBurst") {for(int i=0;i<60;i++)player.RequestTackle();return;}
             if (command.action == "move") { move = new Vector2(command.x, command.y); sprint = command.sprint; return; }
             if (command.action == "cancelBurst") { for (int i = 0; i < 300; i++) player.CancelKick(); return; }
             if (command.action == "humanOff")
@@ -228,7 +260,8 @@ namespace PointPass.Networking
                     InputSystem.Update();
                     return;
                 }
-                PointPass.UI.HoldActionButton button = command.action.StartsWith("touchPass") ? world.Hud.PassButton : world.Hud.ShootButton;
+                PointPass.UI.HoldActionButton button = command.action.StartsWith("touchPass") ? world.Hud.PassButton
+                    : command.action.StartsWith("touchTackle") ? world.Hud.TackleButton : command.action.StartsWith("touchSprint") ? world.Hud.SprintButton : world.Hud.ShootButton;
                 PointerEventData pointer = new PointerEventData(EventSystem.current) { pointerId = 42, position = new Vector2(900, 400) };
                 if (command.action.EndsWith("Tap")) { button.OnPointerDown(pointer); button.OnPointerUp(pointer); }
                 else if (command.action.EndsWith("Down")) button.OnPointerDown(pointer);
@@ -330,6 +363,7 @@ namespace PointPass.Networking
         {
             if (session != null) session.StateReceived -= Record;
             snapshots?.Dispose();
+            mainThreadRecorder.Dispose();gcRecorder.Dispose();
             Application.runInBackground = previousBackground;
         }
     }

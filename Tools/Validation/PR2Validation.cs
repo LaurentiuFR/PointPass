@@ -228,16 +228,19 @@ public static class PR2Validation
         var movement=p.GetComponent<PlayerMovement>(); var dribbler=p.GetComponent<Dribbler>();
         Call(dribbler,"Awake"); var possession=new PossessionSystem(); dribbler.Init(ball,possession,null);
         Physics2D.SyncTransforms(); Call(dribbler,"FixedUpdate"); controller.SetSprint(true);
-        foreach(var direction in new[]{Vector2.up,Vector2.left,Vector2.right})
+        controller.SetMove(Vector2.up); bool retained=true;
+        for(int i=0;i<50;i++)
         {
-            controller.SetMove(direction); bool retained=true;
-            for(int i=0;i<50;i++)
-            {
-                Call(movement,"FixedUpdate"); Call(dribbler,"FixedUpdate"); Call(ball,"FixedUpdate"); Physics2D.Simulate(0.02f);
-                if(!possession.IsOwner(controller)) retained=false;
-            }
-            Check(retained,"Sprint dribble retains possession through direction "+direction);
+            Call(movement,"FixedUpdate"); Call(dribbler,"FixedUpdate"); Call(ball,"FixedUpdate"); Physics2D.Simulate(0.02f);
+            if(!possession.IsOwner(controller)) retained=false;
         }
+        Check(retained,"Straight sprint dribble retains possession with timed boot touches");
+        Check(Vector2.Distance(controller.Body.position,ball.Body.position)<1,"Straight dribble stays close to the feet");
+        controller.SetMove(Vector2.down);
+        for(int i=0;i<10;i++)
+        { Call(movement,"FixedUpdate");Call(dribbler,"FixedUpdate");Call(ball,"FixedUpdate");Physics2D.Simulate(.02f); }
+        Check(!possession.IsOwner(controller),"An abrupt sprint reversal can release an interceptable ball");
+        Check(ball.Body.linearVelocity.y>=0,"A released ball is not pulled backwards into the new direction");
         UnityEngine.Object.DestroyImmediate(p); UnityEngine.Object.DestroyImmediate(b);
     }
 
@@ -267,7 +270,7 @@ public static class PR2Validation
         Check(c.ChargingKick==PlayerKicker.KickType.Pass,"Fresh mobile press works after focus restoration");
         hud.PassButton.Cancel(); Call(k,"FixedUpdate");
         Check(possession.IsOwner(c),"Cancelled mobile charge retains possession");
-        Check(hud.transform.Find("SafeArea/PassButton")!=null,"Action controls are under safe-area layout");
+        Check(hud.PassButton.transform.IsChildOf(hud.ControlLayout.SafeArea),"Editable action controls remain under safe-area layout");
         hud.SetCharge(PlayerKicker.KickType.Pass,2);
         var passRing=hud.PassButton.transform.Find("PowerRing").GetComponent<UnityEngine.UI.Image>();
         var shotRing=hud.ShootButton.transform.Find("PowerRing").GetComponent<UnityEngine.UI.Image>();
@@ -280,7 +283,7 @@ public static class PR2Validation
         foreach(var graphic in hud.GetComponentsInChildren<UnityEngine.UI.Graphic>(true))
             if(graphic.raycastTarget && graphic.name!="PassButton" && graphic.name!="ShootButton"
                 && graphic.name!="SprintButton" && graphic.name!="JoystickBase" && graphic.name!="PauseButton"
-                && graphic.name!="CancelCharge") decorativeHit=true;
+                && graphic.name!="CancelCharge" && graphic.name!="TackleButton" && graphic.name!="EditControls") decorativeHit=true;
         Check(!decorativeHit,"Decorative HUD graphics never intercept touch input");
         hud.ShowMessage("FULL TIME\n"+MatchHud.ScoreLine(2,1)+"\nTap to play again");
         var banner=hud.transform.Find("SafeArea/Banner");

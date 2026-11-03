@@ -6,7 +6,9 @@ foreach ($property in $manifest.dependencies.PSObject.Properties) {
 }
 foreach ($packageName in @('com.unity.inputsystem', 'com.unity.ugui', 'com.unity.netcode.gameobjects',
     'com.unity.transport', 'com.unity.collections', 'com.unity.burst', 'com.unity.mathematics',
-    'com.unity.nuget.mono-cecil', 'com.unity.test-framework', 'com.unity.test-framework.performance')) {
+    'com.unity.nuget.mono-cecil', 'com.unity.test-framework', 'com.unity.test-framework.performance',
+    'com.unity.render-pipelines.core', 'com.unity.render-pipelines.universal',
+    'com.unity.render-pipelines.universal-config', 'com.unity.shadergraph', 'com.unity.searcher')) {
     $package = @(Get-ChildItem "$RepositoryRoot/Library/PackageCache" -Directory -Filter "$packageName@*")
     if ($package.Count -ne 1) { throw "Expected one locally resolved $packageName package. Open PointPass in Unity first." }
     $Dependencies[$packageName] = 'file:' + $package[0].FullName.Replace('\', '/')

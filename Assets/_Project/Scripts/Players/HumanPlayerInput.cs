@@ -20,6 +20,7 @@ namespace PointPass.Players
         private bool gamepadPassHeld;
         private bool gamepadShotHeld;
         private bool cancelHeld;
+        private bool tackleHeld;
         private Gamepad actionGamepad;
         private bool sprintReady;
         private bool focused = true;
@@ -41,6 +42,7 @@ namespace PointPass.Players
             hud.ShootButton.Cancelled += OnShotCancelled;
             hud.ShootButton.FlickChanged += OnShotFlick;
             hud.CancelChargeRequested += OnTouchCancelCharge;
+            hud.TackleButton.Pressed += OnTackle;
         }
 
         private void Awake()
@@ -77,6 +79,8 @@ namespace PointPass.Players
             cancelHeld = (Keyboard.current != null && Keyboard.current.escapeKey.isPressed)
                 || (Gamepad.current != null && Gamepad.current.buttonNorth.isPressed);
             actionGamepad = Gamepad.current;
+            tackleHeld = (Keyboard.current != null && Keyboard.current.lKey.isPressed)
+                || (Gamepad.current != null && Gamepad.current.buttonWest.isPressed);
             sprintReady = false;
         }
 
@@ -85,11 +89,11 @@ namespace PointPass.Players
             Keyboard keyboard = Keyboard.current;
             Gamepad gamepad = Gamepad.current;
             if (gamepad != null && (gamepad.leftStick.ReadValue().sqrMagnitude > 0.04f
-                || gamepad.buttonSouth.isPressed || gamepad.buttonEast.isPressed || gamepad.rightShoulder.isPressed))
+                || gamepad.buttonSouth.isPressed || gamepad.buttonEast.isPressed || gamepad.buttonWest.isPressed || gamepad.rightShoulder.isPressed))
                 usingGamepad = true;
             if ((keyboard != null && keyboard.anyKey.wasPressedThisFrame)
                 || (joystick != null && joystick.Value.sqrMagnitude > 0.01f)
-                || (hud != null && (hud.PassButton.IsHeld || hud.ShootButton.IsHeld || hud.SprintButton.IsHeld)))
+                || (hud != null && (hud.PassButton.IsHeld || hud.ShootButton.IsHeld || hud.SprintButton.IsHeld || hud.TackleButton.IsHeld)))
                 usingGamepad = false;
             bool pass = keyboard != null && keyboard.jKey.isPressed;
             bool shot = keyboard != null && keyboard.kKey.isPressed;
@@ -97,6 +101,8 @@ namespace PointPass.Players
             bool padShot = gamepad != null && gamepad.buttonEast.isPressed;
             bool cancelDown = (keyboard != null && keyboard.escapeKey.isPressed)
                 || (gamepad != null && gamepad.buttonNorth.isPressed);
+            bool tackleDown = (keyboard != null && keyboard.lKey.isPressed)
+                || (gamepad != null && gamepad.buttonWest.isPressed);
             if (gamepad != actionGamepad)
             {
                 // A replacement pad must not release the old pad's kick or inherit its held buttons.
@@ -106,6 +112,7 @@ namespace PointPass.Players
                 gamepadShotHeld = padShot;
                 sprintReady = false;
                 actionGamepad = gamepad;
+                tackleHeld = tackleDown;
             }
             bool sprint = (keyboard != null && keyboard.leftShiftKey.isPressed)
                 || (gamepad != null && gamepad.rightShoulder.isPressed)
@@ -115,7 +122,7 @@ namespace PointPass.Players
             wasControllerActive = controller.IsActive;
             if (reactivated) SuppressHeldKeys();
 
-            if (!controller.IsActive || !focused || applicationPaused || reactivated)
+            if (!controller.IsActive || !focused || applicationPaused || reactivated || MobileControlEditor.IsOpen)
             {
                 ClearActions();
                 controller.SetMove(Vector2.zero);
@@ -123,6 +130,7 @@ namespace PointPass.Players
             else
             {
                 controller.SetMove(ReadMove());
+                if (tackleDown && !tackleHeld) OnTackle();
                 UpdateShotCurve(keyboard, gamepad);
                 bool cancel = !cancelHeld && (cancelDown
                     || (keyboard != null && keyboard.escapeKey.wasPressedThisFrame)
@@ -144,6 +152,7 @@ namespace PointPass.Players
             gamepadPassHeld = padPass;
             gamepadShotHeld = padShot;
             cancelHeld = cancelDown;
+            tackleHeld = tackleDown;
             if (hud != null)
             {
                 hud.SetCharge(controller.ChargingKick, controller.KickCharge, controller.ShotCurve);
@@ -152,6 +161,7 @@ namespace PointPass.Players
                 hud.PassButton.SetCommandHeld(controller.ChargingKick == PlayerKicker.KickType.Pass);
                 hud.ShootButton.SetCommandHeld(controller.ChargingKick == PlayerKicker.KickType.Shot);
                 hud.SprintButton.SetCommandHeld(sprintActive);
+                hud.SetAthleticState(controller.Stamina, controller.Tackler);
             }
         }
 
@@ -177,6 +187,12 @@ namespace PointPass.Players
         {
             if (!isActiveAndEnabled || !controller.IsActive || !focused || applicationPaused) return;
             CancelCurrentKick();
+        }
+        private void OnTackle()
+        {
+            if (!isActiveAndEnabled || !focused || applicationPaused || MobileControlEditor.IsOpen
+                || !controller.IsActive || !wasControllerActive) return;
+            if(controller.RequestTackle()) kickSource=KickSource.None;
         }
 
         private void BeginKick(PlayerKicker.KickType type, KickSource source)
@@ -240,6 +256,7 @@ namespace PointPass.Players
             hud.PassButton.Cancel();
             hud.ShootButton.Cancel();
             hud.SprintButton.Cancel();
+            hud.TackleButton.Cancel();
             hud.PassButton.SetCommandHeld(false);
             hud.ShootButton.SetCommandHeld(false);
             hud.SprintButton.SetCommandHeld(false);
@@ -287,6 +304,7 @@ namespace PointPass.Players
             hud.ShootButton.Cancelled -= OnShotCancelled;
             hud.ShootButton.FlickChanged -= OnShotFlick;
             hud.CancelChargeRequested -= OnTouchCancelCharge;
+            hud.TackleButton.Pressed -= OnTackle;
         }
 
         private Vector2 ReadMove()
