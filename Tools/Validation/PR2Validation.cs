@@ -27,7 +27,7 @@ public static class PR2Validation
     public static void Run()
     {
         int exit = 0;
-        try { Kicks(); Movement(); Buttons(); Joystick(); PhysicalPass(); DribbleFeel(); InputRouting(); InputFeelValidation.Run(Check); TurningValidation.Run(Check); PresentationValidation.Run(Check); MenuValidation.Run(Check); FlowAnimationValidation.Run(Check); CurveValidation.Run(Check); FlickValidation.Run(Check); StadiumValidation.Run(Check); GoalPresentationValidation.Run(Check); MatchDayValidation.Run(Check); GoalMomentValidation.Run(Check); MenuSharpnessValidation.Run(Check); LightingValidation.Run(Check); ReplayValidation.Run(Check); PracticeValidation.Run(Check); ReplayControlsValidation.Run(Check); MobileCancellationValidation.Run(Check); AudioFeedbackValidation.Run(Check); }
+        try { Kicks(); Movement(); Buttons(); Joystick(); PhysicalPass(); DribbleFeel(); InputRouting(); InputFeelValidation.Run(Check); TurningValidation.Run(Check); PresentationValidation.Run(Check); MenuValidation.Run(Check); FlowAnimationValidation.Run(Check); CurveValidation.Run(Check); FlickValidation.Run(Check); StadiumValidation.Run(Check); GoalPresentationValidation.Run(Check); MatchDayValidation.Run(Check); GoalMomentValidation.Run(Check); MenuSharpnessValidation.Run(Check); LobbyValidation.Run(Check); LightingValidation.Run(Check); ReplayValidation.Run(Check); PracticeValidation.Run(Check); ReplayControlsValidation.Run(Check); MobileCancellationValidation.Run(Check); AudioFeedbackValidation.Run(Check); }
         catch (Exception ex) { results.Add(ex.ToString()); exit = 1; }
         File.WriteAllLines("../PR2Verification/engine-tests.txt", results);
         Debug.Log(string.Join("\n", results));
@@ -59,13 +59,13 @@ public static class PR2Validation
         Check(possession.IsOwner(c), "Release queues until physics tick");
         Call(k,"FixedUpdate");
         Check(!possession.HasOwner, "Kick releases ownership");
-        Check(Near(ball.Body.linearVelocity.y,8), "Tap pass minimum speed");
+        Check(Near(ball.Body.linearVelocity.y,12), "Tap pass minimum speed");
         Check(ball.Body.position == originalPosition, "Kick does not teleport");
         Check(Physics2D.GetIgnoreCollision(p.GetComponent<Collider2D>(),ball.Collider), "Kicker collision temporarily ignored");
         Call(d,"FixedUpdate");
-        Check(!possession.HasOwner && Near(ball.Body.linearVelocity.y,8), "Dribbler cannot overwrite kick or immediately reacquire");
+        Check(!possession.HasOwner && Near(ball.Body.linearVelocity.y,12), "Dribbler cannot overwrite kick or immediately reacquire");
         Call(k,"FixedUpdate");
-        Check(Near(ball.Body.linearVelocity.y,8), "Queued kick consumed once");
+        Check(Near(ball.Body.linearVelocity.y,12), "Queued kick consumed once");
         c.SetActive(false);
         Check(!Physics2D.GetIgnoreCollision(p.GetComponent<Collider2D>(),ball.Collider), "Freeze restores collision");
         c.SetActive(true);
@@ -75,7 +75,7 @@ public static class PR2Validation
             {
                 possession.TryAcquire(c); c.Body.rotation = -90;
                 c.BeginKick(type); Set(k,"chargeStarted",Time.time-charge*(type == PlayerKicker.KickType.Pass ? 0.65f : 1f));
-                float expected = Mathf.Lerp(type == PlayerKicker.KickType.Pass ? 8:10, type == PlayerKicker.KickType.Pass ? 14:20, Mathf.Clamp01(charge));
+                float expected = Mathf.Lerp(type == PlayerKicker.KickType.Pass ? 12:10, type == PlayerKicker.KickType.Pass ? 21:20, Mathf.Clamp01(charge));
                 c.ReleaseKick(type); Call(k,"FixedUpdate");
                 Check(Near(ball.Body.linearVelocity.x, expected) && Near(ball.Body.linearVelocity.y,0), type + " charge " + charge + " and facing");
             }
@@ -84,12 +84,12 @@ public static class PR2Validation
         c.SetMove(Vector2.down); c.BeginKick(PlayerKicker.KickType.Pass);
         originalPosition=ball.Body.position;
         c.ReleaseKick(PlayerKicker.KickType.Pass); Call(k,"FixedUpdate");
-        Check(Near(ball.Body.linearVelocity.y,-8) && Near(ball.Body.linearVelocity.x,0),
+        Check(Near(ball.Body.linearVelocity.y,-12) && Near(ball.Body.linearVelocity.x,0),
             "Immediate backward pass ignores turn animation and opposite momentum");
         Check(ball.Body.position==originalPosition,"Sharp-angle pass never repositions ball");
         possession.TryAcquire(c); c.SetMove(Vector2.right); c.Body.linearVelocity=Vector2.right*6.48f;
         c.BeginKick(PlayerKicker.KickType.Pass); c.ReleaseKick(PlayerKicker.KickType.Pass); Call(k,"FixedUpdate");
-        Check(Near(ball.Body.linearVelocity.x,9.62f),"Moving pass has controlled forward follow-through");
+        Check(Near(ball.Body.linearVelocity.x,13.62f),"Moving pass has controlled forward follow-through");
         c.Body.linearVelocity=Vector2.zero;
         possession.TryAcquire(c);
         var guide=p.AddComponent<PlayerAimGuide>(); Call(guide,"Awake"); guide.Init(ball);

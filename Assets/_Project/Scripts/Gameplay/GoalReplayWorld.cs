@@ -40,7 +40,10 @@ namespace PointPass.Gameplay
             boneRenderers = new SpriteRenderer[actors.Length][];
             for (int i = 0; i < actors.Length; i++)
             {
-                PlayerController actor = MatchBootstrap.CreatePlayer(transform, clip.teams[i], replayBall, possession, Vector2.zero, 0);
+                bool goalkeeper = clip.goalkeepers != null && i < clip.goalkeepers.Length && clip.goalkeepers[i];
+                PlayerController actor = goalkeeper
+                    ? MatchBootstrap.CreateGoalkeeper(transform, clip.teams[i], replayBall, possession, Vector2.zero, 0)
+                    : MatchBootstrap.CreatePlayer(transform, clip.teams[i], replayBall, possession, Vector2.zero, 0);
                 actors[i] = actor.transform;
                 int count = clip.rigs != null && i < clip.rigs.Length && clip.rigs[i].paths != null ? clip.rigs[i].paths.Length : 0;
                 bones[i] = new Transform[count]; boneRenderers[i] = new SpriteRenderer[count];

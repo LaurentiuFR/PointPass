@@ -37,9 +37,10 @@ namespace PointPass.Gameplay
             public float time, side, speed;
             public Vector2 point;
         }
-        public int version = 2;
+        public int version = 3;
         public Team scoringTeam;
         public Team[] teams;
+        public bool[] goalkeepers;
         public ActorRig[] rigs;
         public Shot[] shots;
         public NetImpact[] impacts;

@@ -63,6 +63,7 @@ namespace PointPass.Players
         public void CancelKick() => Kicker?.Cancel();
         public void SetShotCurve(float curve) { if (IsActive) Kicker?.SetShotCurve(curve); }
         public void SetSprint(bool held) => Movement.SetSprint(IsActive && held);
+        public void SetAim(Vector2 direction) { if (IsActive) Movement.SetAimDirection(direction); }
 
         // ---- Match control (used by MatchManager) ----
 

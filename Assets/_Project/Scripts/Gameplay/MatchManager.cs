@@ -43,6 +43,7 @@ namespace PointPass.Gameplay
         public bool IsUserPaused => userPaused;
         public bool IsInMainMenu => phase == Phase.MainMenu;
         public bool IsPracticing => practice != null && practice.IsRunning;
+        public bool IsMatchLive => phase == Phase.Playing && !userPaused;
         public event System.Action<Team> GoalScored;
         public event System.Action MatchWhistle;
 
@@ -78,6 +79,8 @@ namespace PointPass.Gameplay
             if (menu == null) return;
             menu.PlayRequested += StartMatch;
             menu.PracticeRequested += StartPractice;
+            menu.FreePlayRequested += StartFreePlay;
+            menu.ScenarioRequested += StartScenario;
             menu.ResumeRequested += ResumeMatch;
             menu.RestartRequested += RestartSession;
             menu.MainMenuRequested += OpenMainMenu;
@@ -89,6 +92,8 @@ namespace PointPass.Gameplay
             if (menu == null) return;
             menu.PlayRequested -= StartMatch;
             menu.PracticeRequested -= StartPractice;
+            menu.FreePlayRequested -= StartFreePlay;
+            menu.ScenarioRequested -= StartScenario;
             menu.ResumeRequested -= ResumeMatch;
             menu.RestartRequested -= RestartSession;
             menu.MainMenuRequested -= OpenMainMenu;
@@ -106,6 +111,8 @@ namespace PointPass.Gameplay
             RestoreGameTime();
             EndPractice();
             menu?.Hide();
+            foreach (PlayerController player in players)
+                player.GetComponent<GoalkeeperBrain>()?.SetDifficulty(menu != null ? menu.KeeperDifficulty : 1);
             hud.gameObject.SetActive(true);
             SetPlayerInput(true);
             phase = Phase.Paused;
@@ -134,18 +141,35 @@ namespace PointPass.Gameplay
             hud.ShowMessage(string.Empty);
             phase = Phase.Practice;
             SetPlayerInput(true);
+            SetKeepersVisible(false);
             practice.BeginSession();
             practiceHud?.SetVisible(true);
         }
 
         private void RestartSession()
         {
-            if (IsPracticing) StartPractice();
+            if (IsPracticing && practice.IsFreePlay) StartFreePlay();
+            else if (IsPracticing) StartPractice();
             else StartMatch();
+        }
+
+        public void StartFreePlay()
+        {
+            StartPractice();
+            practice?.BeginFreePlay();
+        }
+
+        public void StartScenario(bool penalty)
+        {
+            StartFreePlay();
+            if (players.Count == 0) return;
+            players[0].GetComponent<PlayerMovement>().ResetTo(new Vector2(penalty ? 5.5f : 3.5f, penalty ? 0 : -2f), -90);
+            practice.ResetBall();
         }
 
         private void EndPractice()
         {
+            SetKeepersVisible(true);
             practice?.EndSession();
             practiceHud?.SetVisible(false);
             hud?.SetPracticeMode(false);
@@ -166,7 +190,7 @@ namespace PointPass.Gameplay
             confetti?.Celebrate(scoringTeam);
             referee?.SignalGoal(scoringTeam);
             photographers?.Celebrate();
-            PlayerController scorer=ball.LastTouch;
+            PlayerController scorer=ball.GoalScorer(scoringTeam);
             lastScoringTeam=scoringTeam;
             wasOwnGoal=scorer!=null && scorer.Team!=scoringTeam;
             if (scorer!=null && scorer.Team==scoringTeam) scorer.GetComponent<PlayerAnimator>()?.CelebrateGoal();
@@ -357,6 +381,7 @@ namespace PointPass.Gameplay
                 if (player == null) continue;
                 player.GetComponent<PlayerAnimator>()?.ClearCelebration();
                 player.ResetToKickoff();
+                player.GetComponent<GoalkeeperBrain>()?.ResetKeeper();
             }
         }
 
@@ -369,6 +394,14 @@ namespace PointPass.Gameplay
                 if (player == null) continue;
                 player.SetActive(playing);
             }
+        }
+
+        private void SetKeepersVisible(bool visible)
+        {
+            if (players == null) return;
+            foreach (PlayerController player in players)
+                if (player != null && player.GetComponent<GoalkeeperBrain>() != null)
+                    player.gameObject.SetActive(visible);
         }
 
         private void UpdateClock()

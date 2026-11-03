@@ -36,19 +36,19 @@ namespace PointPass.UI
         private bool practiceMode;
         private Text pauseDescription, pauseRestartLabel;
         private int lastActivationFrame = -1;
-        private RectTransform heroMotion;
-        private RectTransform menuBall;
-        private CanvasGroup mainEntrance;
-        private float menuAge;
+        private LobbyMenuView lobbyView;
         private GoalReplayClip latestReplay;
         private GoalReplayView replayView;
         private Screen replayOrigin;
         private Button pauseReplay;
         private Button resultsReplay;
-        private readonly List<Text> themeLabels = new List<Text>();
 
         public event Action PlayRequested;
         public event Action PracticeRequested;
+        public event Action FreePlayRequested;
+        public event Action<bool> ScenarioRequested;
+        public int KeeperDifficulty { get; private set; } = 1;
+        public LobbyMenuView Lobby => lobbyView;
         public event Action ResumeRequested;
         public event Action RestartRequested;
         public event Action MainMenuRequested;
@@ -94,24 +94,18 @@ namespace PointPass.UI
         {
             if (UnityEngine.Screen.safeArea != lastSafeArea || UnityEngine.Screen.width != lastSize.x
                 || UnityEngine.Screen.height != lastSize.y) ApplyLayout();
-            AdvanceMotion(Time.unscaledDeltaTime);
+
         }
 
-        public void AdvanceMotion(float seconds)
-        {
-            if (CurrentScreen != Screen.Main || heroMotion == null) return;
-            menuAge += seconds;
-            mainEntrance.alpha = Mathf.SmoothStep(0,1,menuAge / 0.45f);
-            heroMotion.anchoredPosition = new Vector2(-27, 39 + Mathf.Sin(menuAge * 1.3f) * 4f);
-            heroMotion.localRotation = Quaternion.Euler(0,0,-28 + Mathf.Sin(menuAge * 0.7f) * 1.2f);
-            menuBall.anchoredPosition = new Vector2(126 + Mathf.Sin(menuAge * 0.9f) * 5f, 142 + Mathf.Cos(menuAge * 0.9f) * 4f);
-            menuBall.localRotation = Quaternion.Euler(0,0,-menuAge * 9f);
-        }
+        // Kept for existing appearance-review callers; the native match preview is static.
+        public void AdvanceMotion(float seconds) { }
 
         private void OnEnable()
         {
             if (safeArea != null) ApplyLayout();
         }
+
+        public void RefreshLayout() => ApplyLayout();
 
         private void ApplyLayout()
         {
@@ -124,12 +118,19 @@ namespace PointPass.UI
             safeArea.anchorMax = new Vector2(lastSafeArea.xMax / width, lastSafeArea.yMax / height);
             safeArea.offsetMin = safeArea.offsetMax = Vector2.zero;
             Canvas.ForceUpdateCanvases();
-            Vector2 available = safeArea.rect.size - Vector2.one * 64;
-            float scale = Mathf.Clamp(Mathf.Min(available.x / 1320f, available.y / 820f), 0.2f, 1f);
+            Vector2 design = CurrentScreen == Screen.Main ? (lobbyView != null ? lobbyView.DesignSize : new Vector2(1824, 844)) : new Vector2(1320, 820);
+            content.sizeDelta = design;
+            Vector2 available = safeArea.rect.size - Vector2.one * (CurrentScreen == Screen.Main ? 16 : 40);
+            float scale = Mathf.Max(0.2f, Mathf.Min(available.x / design.x, available.y / design.y));
             content.localScale = Vector3.one * scale;
         }
 
-        public void ShowMain() => Show(Screen.Main);
+        public void ShowMain() { lobbyView?.ShowPage(LobbyMenuView.Page.MainLobby); Show(Screen.Main); }
+        public void RequestOfflineMatch(int difficulty = 1) { KeeperDifficulty = Mathf.Clamp(difficulty, 0, 2); lobbyView?.CloseModal(); PlayRequested?.Invoke(); }
+        public void RequestPassingPractice() { lobbyView?.CloseModal(); PracticeRequested?.Invoke(); }
+        public void RequestFreePlay() { lobbyView?.CloseModal(); FreePlayRequested?.Invoke(); }
+        public void RequestScenario(bool penalty) { lobbyView?.CloseModal(); ScenarioRequested?.Invoke(penalty); }
+        public void RequestControls() => lobbyView.ShowGuide();
         public void ShowPause() => Show(Screen.Pause);
 
         public void ShowResults(int blue, int red)
@@ -147,11 +148,10 @@ namespace PointPass.UI
 
         private void Show(Screen screen)
         {
-            if (screen == Screen.Main) { menuAge = 0; if (mainEntrance != null) mainEntrance.alpha = 0; }
             CurrentScreen = screen;
             gameObject.SetActive(true);
             foreach (KeyValuePair<Screen, GameObject> entry in screens) entry.Value.SetActive(entry.Key == screen);
-            backdrop.color = screen == Screen.Main ? Ink : new Color(Ink.r, Ink.g, Ink.b, 0.96f);
+            backdrop.color = screen == Screen.Main ? LobbyMenuView.ClubhouseNavy : new Color(Ink.r, Ink.g, Ink.b, 0.96f);
             ApplyLayout();
             EventSystem system = EventSystem.current;
             if (system != null)
@@ -171,6 +171,7 @@ namespace PointPass.UI
         public bool TryBack()
         {
             if (!IsOpen) return false;
+            if (CurrentScreen == Screen.Main) return lobbyView != null && lobbyView.TryBack();
             if (CurrentScreen == Screen.Controls) { Show(controlsOrigin); return true; }
             if (CurrentScreen == Screen.Audio) { Show(audioOrigin); return true; }
             if (CurrentScreen == Screen.Replay) { Show(replayOrigin); return true; }
@@ -202,42 +203,9 @@ namespace PointPass.UI
         private void BuildMain()
         {
             RectTransform page = Page(Screen.Main);
-            mainEntrance = page.gameObject.AddComponent<CanvasGroup>();
-            Image matchday = Panel(page,"MatchdayBadge",Surface,new Vector2(-492,335),new Vector2(280,40));
-            Label(matchday.transform,"BadgeText","MATCHDAY  /  YOUR PITCH",16,Vector2.zero,new Vector2(264,36),Mint,true);
-            Label(page, "Wordmark", "POINT<color=#B7F433>PASS</color>", 89, new Vector2(-342, 235), new Vector2(600, 110), Paper, true, TextAnchor.MiddleLeft);
-            Label(page, "Headline", "MAKE EVERY\nPASS COUNT.", 43, new Vector2(-342, 100), new Vector2(580, 125), Paper, true, TextAnchor.MiddleLeft);
-            Label(page, "Description", "Play the space. Find your teammate.\nTurn one good pass into a great goal.", 25,
-                new Vector2(-342, -20), new Vector2(580, 90), Muted, false, TextAnchor.MiddleLeft);
-            Button play = ActionButton(page, "PlayOffline", "PLAY OFFLINE    >", new Vector2(-372, -151), new Vector2(520, 88), true,
-                () => PlayRequested?.Invoke());
-            ActionButton(page, "PassingPractice", "PASSING PRACTICE", new Vector2(-372, -239), new Vector2(520, 68), false,
-                () => PracticeRequested?.Invoke());
-            ActionButton(page, "HowToPlay", "HOW TO PLAY", new Vector2(-372, -320), new Vector2(520, 68), false,
-                () => ShowControls(Screen.Main));
-            firstButtons.Add(Screen.Main, play);
-            Label(page, "Mode", "OFFLINE PROTOTYPE  /  SINGLE PLAYER", 16, new Vector2(-342, -386), new Vector2(580, 24), Muted, false, TextAnchor.MiddleLeft);
-
-            Image card = Panel(page, "HeroCard", Surface, new Vector2(357, 30), new Vector2(550, 680));
-            RectTransform graphic = Rect(card.transform,"TacticalPitch");
-            Place(graphic,Vector2.zero,new Vector2(500,615));
-            FootballGraphic football = graphic.gameObject.AddComponent<FootballGraphic>();
-            football.raycastTarget = false;
-            football.ShowRoute = false;
-            Label(card.transform, "HeroEyebrow", "THE PITCH IS YOURS", 20, new Vector2(0, 281), new Vector2(470, 40), Mint);
-            RectTransform hero = Rect(card.transform, "Hero");
-            heroMotion = hero;
-            Place(hero, new Vector2(-27, 39), new Vector2(330, 330));
-            hero.localRotation = Quaternion.Euler(0, 0, -28);
-            PictureAt(hero, "LeftBoot", SpriteLibrary.Get("boot_polished"), Color.white, new Vector2(-38, 108), new Vector2(96, 114));
-            PictureAt(hero, "RightBoot", SpriteLibrary.Get("boot_polished"), Color.white, new Vector2(38, 108), new Vector2(96, 114));
-            PictureAt(hero, "Player", SpriteLibrary.Get("player_blue_polished"), Color.white, Vector2.zero, new Vector2(330, 330));
-            menuBall = PictureAt(card.transform, "Football", SpriteLibrary.Get("ball_polished"), Color.white, new Vector2(133, 151), new Vector2(125, 125)).rectTransform;
-            Panel(card.transform,"HeroCaption",Surface,new Vector2(0,-237),new Vector2(500,147));
-            Label(card.transform, "Rules", "TWO HALVES.\nONE GOLDEN CHANCE.", 30, new Vector2(0, -245), new Vector2(460, 90), Paper, true);
-            BuildThemeButton(page, new Vector2(258, -363), new Vector2(352, 48));
-            ActionButton(page, "AudioSettings", "SOUND", new Vector2(542, -363), new Vector2(180, 48), false,
-                () => ShowAudio(Screen.Main));
+            lobbyView = page.gameObject.AddComponent<LobbyMenuView>();
+            lobbyView.Build(this);
+            firstButtons.Add(Screen.Main, lobbyView.FirstButton);
         }
 
         private void BuildPause()
@@ -256,6 +224,8 @@ namespace PointPass.UI
             pauseRestartLabel = restart.GetComponentInChildren<Text>();
             ActionButton(card.transform, "MainMenu", "MAIN MENU", new Vector2(0, -247), new Vector2(520, 76), false,
                 () => MainMenuRequested?.Invoke());
+            ActionButton(page, "AudioSettings", "SOUND SETTINGS", new Vector2(515, 310), new Vector2(270, 54), false,
+                () => ShowAudio(Screen.Pause));
             firstButtons.Add(Screen.Pause, resume);
             pauseReplay=ActionButton(card.transform,"ReplayLastGoal","WATCH LAST GOAL",new Vector2(0,-328),new Vector2(520,54),false,()=>ShowReplay(Screen.Pause));
             pauseReplay.gameObject.SetActive(false);
@@ -315,16 +285,16 @@ namespace PointPass.UI
             Label(page, "Eyebrow", "M A K E   Y O U R   M O V E", 19, new Vector2(0, 326), new Vector2(1120, 40), Mint);
             Label(page, "Title", "HOW TO PLAY", 49, new Vector2(0, 252), new Vector2(1120, 80), Paper, true);
             BuildControlColumn(page, "Keyboard", -405, "KEYBOARD",
-                "<color=#B7F433>WASD / ARROWS</color>\nMove and aim\n\n<color=#B7F433>J / K</color>\nHold pass / shoot, release to kick\n\n<color=#B7F433>Q / E WHILE SHOOTING</color>\nBend left / right\n\n<color=#B7F433>SHIFT / ESC / P</color>\nSprint / cancel / pause");
+                "<color=#7DD3FC>WASD / ARROWS</color>\nMove and aim\n\n<color=#7DD3FC>J / K</color>\nHold pass / shoot, release to kick\n\n<color=#7DD3FC>Q / E WHILE SHOOTING</color>\nBend left / right\n\n<color=#7DD3FC>SHIFT / ESC / P</color>\nSprint / cancel / pause");
             BuildControlColumn(page, "Touch", 0, "TOUCH",
-                "<color=#B7F433>LEFT JOYSTICK</color>\nMove and aim\n\n<color=#B7F433>PASS / SHOOT</color>\nHold to charge, release to kick\n\n<color=#B7F433>FLICK / CANCEL</color>\nFlick from Shoot to bend\nTap Cancel to stop the charge\n\n<color=#B7F433>SPRINT / PAUSE</color>\nRun faster / take a break");
+                "<color=#7DD3FC>LEFT JOYSTICK</color>\nMove and aim\n\n<color=#7DD3FC>PASS / SHOOT</color>\nHold to charge, release to kick\n\n<color=#7DD3FC>FLICK / CANCEL</color>\nFlick from Shoot to bend\nTap Cancel to stop the charge\n\n<color=#7DD3FC>SPRINT / PAUSE</color>\nRun faster / take a break");
             BuildControlColumn(page, "Gamepad", 405, "GAMEPAD",
-                "<color=#B7F433>LEFT STICK</color>\nMove and aim\n\n<color=#B7F433>SOUTH / EAST</color>\nHold pass / shoot, release to kick\n\n<color=#B7F433>RIGHT STICK</color>\nBend a shot toward that side\n\n<color=#B7F433>RB / NORTH / START</color>\nSprint / cancel / pause");
+                "<color=#7DD3FC>LEFT STICK</color>\nMove and aim\n\n<color=#7DD3FC>SOUTH / EAST</color>\nHold pass / shoot, release to kick\n\n<color=#7DD3FC>RIGHT STICK</color>\nBend a shot toward that side\n\n<color=#7DD3FC>RB / NORTH / START</color>\nSprint / cancel / pause");
             Button back = ActionButton(page, "Back", "BACK", new Vector2(-465, -319), new Vector2(260, 72), false,
                 () => Show(controlsOrigin));
             ActionButton(page, "AudioSettings", "SOUND", new Vector2(-185, -319), new Vector2(260, 72), false,
                 () => ShowAudio(Screen.Controls));
-            BuildThemeButton(page, new Vector2(285, -319), new Vector2(640, 72));
+
             firstButtons.Add(Screen.Controls, back);
         }
 
@@ -338,34 +308,18 @@ namespace PointPass.UI
         {
             RectTransform page = Page(Screen.Audio);
             Panel(page, "AudioCard", Surface, Vector2.zero, new Vector2(1000, 800));
-            Label(page, "Title", "SOUND", 49, new Vector2(0, 290), new Vector2(850, 80), Paper, true);
+            Label(page, "Title", "SOUND SETTINGS", 49, new Vector2(0, 290), new Vector2(850, 80), Paper, true);
             page.gameObject.AddComponent<AudioSettingsView>().Build();
             Button back = ActionButton(page, "AudioBack", "BACK", new Vector2(0, -319), new Vector2(400, 72), false,
                 () => Show(audioOrigin));
             firstButtons.Add(Screen.Audio, back);
         }
 
-        private void BuildThemeButton(Transform page, Vector2 position, Vector2 size)
-        {
-            Button button = ActionButton(page, "ColourScheme", "", position, size, false,
-                () => MatchPalette.SetTheme((MatchPalette.InterfaceTheme)(((int)MatchPalette.Theme + 1) % 3)));
-            Text label = button.GetComponentInChildren<Text>();
-            label.fontSize = 19;
-            themeLabels.Add(label);
-            RefreshThemeLabels();
-        }
-
-        private void RefreshThemeLabels()
-        {
-            foreach (Text label in themeLabels)
-                label.text = "COLOURS: NAVY + " + MatchPalette.ThemeName + "    >";
-        }
-
         private void OnAccentChanged(Color previous, Color accent)
         {
             if (this == null) { MatchPalette.AccentChanged -= OnAccentChanged; return; }
             InterfaceTheme.Refresh(transform, previous, accent);
-            RefreshThemeLabels();
+
         }
 
         private void OnDestroy() => MatchPalette.AccentChanged -= OnAccentChanged;
@@ -472,7 +426,7 @@ namespace PointPass.UI
             return text;
         }
 
-        private static Sprite Rounded()
+        internal static Sprite Rounded()
         {
             if (roundedSprite != null) return roundedSprite;
             const int size = 128;

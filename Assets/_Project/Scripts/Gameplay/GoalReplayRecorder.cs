@@ -134,7 +134,7 @@ namespace PointPass.Gameplay
         public void BeginGoal(Team team)
         {
             scoringTeam = team; goalAt = recordedTime; pending = true; SavedToDisk = false;
-            scorer = roster != null ? roster.IndexOf(ball.LastTouch) : -1;
+            scorer = roster != null ? roster.IndexOf(ball.GoalScorer(team)) : -1;
         }
         private void LateUpdate() => Advance(Time.deltaTime);
 
@@ -195,8 +195,12 @@ namespace PointPass.Gameplay
             int skip = 0;
             while (skip < count - 2 && history[(first + skip + 1) % Capacity].time < start) skip++;
             GoalReplayClip clip = new GoalReplayClip { scoringTeam = scoringTeam, goalTime = goalAt, scorer = scorer,
-                teams = new Team[roster.Count], rigs = rigs, frames = new GoalReplayClip.Frame[count - skip] };
-            for (int p = 0; p < roster.Count; p++) clip.teams[p] = roster[p].Team;
+                teams = new Team[roster.Count], goalkeepers = new bool[roster.Count], rigs = rigs, frames = new GoalReplayClip.Frame[count - skip] };
+            for (int p = 0; p < roster.Count; p++)
+            {
+                clip.teams[p] = roster[p].Team;
+                clip.goalkeepers[p] = roster[p].GetComponent<GoalkeeperBrain>() != null;
+            }
             for (int i = skip; i < count; i++)
             {
                 GoalReplayClip.Frame frame = history[(first + i) % Capacity];

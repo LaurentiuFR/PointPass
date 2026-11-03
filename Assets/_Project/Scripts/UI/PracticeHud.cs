@@ -10,6 +10,7 @@ namespace PointPass.UI
         private PassingPractice practice;
         private UnityEngine.UI.Text stats;
         private UnityEngine.UI.Text instruction;
+        private UnityEngine.UI.Text title;
 
         public static PracticeHud Create(Transform safeArea, PassingPractice session)
         {
@@ -19,7 +20,7 @@ namespace PointPass.UI
             PracticeHud view = root.gameObject.AddComponent<PracticeHud>();
             view.practice = session;
             UnityEngine.UI.Image plate = Panel(root, "PracticeReadout", new Vector2(0, -26), new Vector2(650, 94), new Vector2(0.5f, 1));
-            Label(plate.transform, "Title", "PASSING PRACTICE", 19, new Vector2(0, 26), new Vector2(600, 32), MatchPalette.Accent);
+            view.title = Label(plate.transform, "Title", "PASSING PRACTICE", 19, new Vector2(0, 26), new Vector2(600, 32), MatchPalette.Accent);
             view.stats = Label(plate.transform, "Stats", "", 27, new Vector2(0, -16), new Vector2(610, 44), MatchPalette.Paper);
             UnityEngine.UI.Image guide = Panel(root, "PracticeInstruction", new Vector2(0, -130), new Vector2(810, 42), new Vector2(0.5f, 1));
             view.instruction = Label(guide.transform, "Instruction", "", 18, Vector2.zero, new Vector2(790, 38), MatchPalette.Paper);
@@ -44,7 +45,8 @@ namespace PointPass.UI
         private void Refresh()
         {
             if (this == null) { if (practice != null) practice.Changed -= Refresh; return; }
-            stats.text = $"HITS {practice.Hits}  /  PASSES {practice.Attempts}  /  GATE {practice.ActiveGate + 1}";
+            title.text = practice.IsFreePlay ? "FREE PLAY" : "PASSING PRACTICE";
+            stats.text = practice.IsFreePlay ? "NO CLOCK  /  NO TARGETS" : $"HITS {practice.Hits}  /  PASSES {practice.Attempts}  /  GATE {practice.ActiveGate + 1}";
             instruction.text = practice.Feedback;
         }
         private static RectTransform Rect(Transform parent, string name, Vector2 position, Vector2 size, Vector2 anchor)

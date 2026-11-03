@@ -264,14 +264,15 @@ namespace PointPass.Validation
                 int resumes = 0;
                 menu.PlayRequested += () => plays++;
                 menu.ResumeRequested += () => resumes++;
-                Button play = menu.transform.Find("SafeArea/Content/Main/PlayOffline").GetComponent<Button>();
-                Button mainControls = menu.transform.Find("SafeArea/Content/Main/HowToPlay").GetComponent<Button>();
+                Button play = menu.transform.Find("SafeArea/Content/Main/CommunityHubPage/CommunityCard2").GetComponent<Button>();
+                Button mainControls = menu.transform.Find("SafeArea/Content/Main/SettingsPage/Options/HowToPlay").GetComponent<Button>();
                 Button pauseControls = menu.transform.Find("SafeArea/Content/Pause/PauseCard/Controls").GetComponent<Button>();
 
                 menu.ShowMain();
                 check(menu.IsOpen && menu.CurrentScreen == MatchMenu.Screen.Main
-                    && system.currentSelectedGameObject == play.gameObject,
-                    "Main menu selects Play Offline for keyboard/gamepad navigation");
+                    && system.currentSelectedGameObject == menu.Lobby.FirstButton.gameObject,
+                    "Main menu selects Main Lobby for keyboard/gamepad navigation");
+                menu.Lobby.ShowPage(LobbyMenuView.Page.Settings);
                 Click(menu, mainControls);
                 check(menu.IsOpen && menu.CurrentScreen == MatchMenu.Screen.Controls,
                     "How to Play opens a modal controls page");

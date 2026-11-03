@@ -1,4 +1,5 @@
 using System;
+using PointPass.Core;
 using PointPass.Gameplay;
 using UnityEngine;
 
@@ -12,7 +13,7 @@ namespace PointPass.Players
 
         [SerializeField] private float chargeSeconds = 1f;
         [SerializeField] private float passChargeSeconds = 0.65f;
-        [SerializeField] private Vector2 passSpeed = new Vector2(8f, 14f);
+        [SerializeField] private Vector2 passSpeed = new Vector2(MatchConfig.PassMinimumSpeed, MatchConfig.PassMaximumSpeed);
         [SerializeField] private Vector2 shotSpeed = new Vector2(10f, 20f);
         [SerializeField, Range(0f, 1f)] private float forwardMomentum = 0.25f;
 
@@ -97,7 +98,7 @@ namespace PointPass.Players
             Vector2 velocity = pendingVelocity;
             float curve = pendingCurve;
             controller.Dribbler.ReleaseForKick();
-            ball.RecordTouch(controller);
+            ball.RecordKick(controller,type == KickType.Pass);
             ball.Body.linearVelocity = velocity;
             ball.Body.angularVelocity = 0f;
             ball.SetCurve(type == KickType.Shot ? curve : 0f);

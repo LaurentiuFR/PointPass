@@ -37,6 +37,7 @@ namespace PointPass.Players
         private float noPickupUntil;
         private bool waitingForSeparation;
         private float restoreCollisionAt;
+        public bool AutomaticPickup { get; set; } = true;
 
         public bool HasBall => possession != null && possession.IsOwner(controller);
 
@@ -76,7 +77,7 @@ namespace PointPass.Players
                 return;
             }
 
-            if (!carrying) TryPickUp();
+            if (!carrying && AutomaticPickup) TryPickUp();
             if (carrying) Carry();
         }
 
@@ -117,7 +118,8 @@ namespace PointPass.Players
 
             if (Vector2.Distance(ballPosition, FeetTarget()) > acquireRadius) return;
             if (toBall.sqrMagnitude > 0.0001f && Vector2.Dot(toBall.normalized, Facing()) < 0.1f) return; // must be in front
-            if ((ball.Body.linearVelocity - body.linearVelocity).magnitude > maxPickupSpeed) return;
+            float receiveLimit = ball.LastKickWasPass ? 22f : maxPickupSpeed;
+            if ((ball.Body.linearVelocity - body.linearVelocity).magnitude > receiveLimit) return;
 
             if (!possession.TryAcquire(controller)) return; // somebody else already has it
 

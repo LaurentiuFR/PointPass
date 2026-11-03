@@ -31,9 +31,16 @@ namespace PointPass.Core
             Ball ball = CreateBall(root);
             PossessionSystem possession = new PossessionSystem();
 
-            // The roster: every player in the match. For now, one human-controlled blue player.
             PlayerController human = CreatePlayer(root, Team.Blue, ball, possession, new Vector2(-3f, 0f), -90f);
             List<PlayerController> roster = new List<PlayerController> { human };
+            foreach (Team team in new[] { Team.Blue, Team.Red })
+            {
+                float side = team == Team.Blue ? -1 : 1;
+                roster.Add(CreateGoalkeeper(root, team, ball, possession,
+                    new Vector2(side * (MatchConfig.FieldHalfWidth - 0.65f), 0), side > 0 ? 90 : -90));
+            }
+            foreach (PlayerController player in roster)
+                player.GetComponent<GoalkeeperBrain>()?.Init(ball, possession, roster, manager);
 
             MatchHud hud = MatchHud.Create();
             human.gameObject.AddComponent<HumanPlayerInput>().Init(hud);
@@ -86,7 +93,7 @@ namespace PointPass.Core
             Rigidbody2D body = go.AddComponent<Rigidbody2D>();
             body.gravityScale = 0f;
             body.mass = 0.2f;
-            body.linearDamping = 1.2f;
+            body.linearDamping = MatchConfig.PitchBallDamping;
             body.angularDamping = 1f;
             body.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
             body.interpolation = RigidbodyInterpolation2D.Interpolate;
@@ -154,6 +161,35 @@ namespace PointPass.Core
             kicker.Kicked += animator.PlayKick;
             go.AddComponent<StadiumActorLighting>().Init(root);
             return controller;
+        }
+
+        internal static PlayerController CreateGoalkeeper(Transform root, Team team, Ball ball,
+            PossessionSystem possession, Vector2 position, float angle)
+        {
+            PlayerController keeper = CreatePlayer(root, team, ball, possession, position, angle);
+            keeper.name = team + " Goalkeeper";
+            keeper.GetComponent<CircleCollider2D>().radius = 0.34f;
+            keeper.Body.mass = 1.5f;
+            Material original = SpriteLibrary.KitMaterial(team);
+            Material kit = original != null ? new Material(original) { name = team + " goalkeeper kit" } : null;
+            if (kit != null)
+            {
+                kit.SetColor("_ClubColor", team == Team.Blue ? new Color(0.93f, 0.72f, 0.28f) : new Color(0.22f, 0.72f, 0.66f));
+                keeper.transform.Find("Sprite").GetComponent<SpriteRenderer>().sharedMaterial = kit;
+            }
+            foreach (string arm in new[] { "LeftArm", "RightArm" })
+            {
+                Transform elbow = keeper.transform.Find(arm + "/Elbow");
+                GameObject glove = new GameObject("Glove", typeof(SpriteRenderer));
+                glove.transform.SetParent(elbow, false);
+                glove.transform.localPosition = new Vector3(0, -0.115f, 0);
+                glove.transform.localScale = new Vector3(0.14f, 0.16f, 1);
+                SpriteRenderer renderer = glove.GetComponent<SpriteRenderer>();
+                renderer.sprite = SpriteLibrary.WhiteCircle(); renderer.color = MatchPalette.Paper; renderer.sortingOrder = 6;
+            }
+            keeper.gameObject.AddComponent<GoalkeeperBrain>();
+            keeper.gameObject.AddComponent<GoalkeeperVisual>().Init(kit);
+            return keeper;
         }
 
         private static Transform CreateArm(Transform player, bool left)

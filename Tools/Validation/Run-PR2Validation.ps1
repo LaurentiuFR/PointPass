@@ -32,7 +32,7 @@ Copy-Item "$PSScriptRoot/GoalMomentValidation.cs" "$validationRoot/Assets/Editor
 Copy-Item "$PSScriptRoot/MenuSharpnessValidation.cs" "$validationRoot/Assets/Editor/MenuSharpnessValidation.cs"
 Copy-Item "$PSScriptRoot/LightingValidation.cs" "$validationRoot/Assets/Editor/LightingValidation.cs"
 Copy-Item "$PSScriptRoot/ReplayValidation.cs" "$validationRoot/Assets/Editor/ReplayValidation.cs"
-foreach ($helper in @('PracticeValidation', 'ReplayControlsValidation', 'MobileCancellationValidation', 'AudioFeedbackValidation')) {
+foreach ($helper in @('LobbyValidation', 'PracticeValidation', 'ReplayControlsValidation', 'MobileCancellationValidation', 'AudioFeedbackValidation')) {
     Copy-Item "$PSScriptRoot/$helper.cs" "$validationRoot/Assets/Editor/$helper.cs"
 }
 Copy-Item "$repositoryRoot/ProjectSettings/ProjectVersion.txt" "$validationRoot/ProjectSettings/ProjectVersion.txt"

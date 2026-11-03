@@ -24,6 +24,11 @@ namespace PointPass.Players
         private Vector2 velocityChange;
 
         public void SetSprint(bool held) => sprinting = held;
+        public void SetAimDirection(Vector2 direction)
+        {
+            if (direction.sqrMagnitude < 0.001f) return;
+            lastAim = direction.normalized; hasAim = true;
+        }
 
         public Rigidbody2D Body => body != null ? body : (body = GetComponent<Rigidbody2D>());
         public float SpeedMultiplier { get; set; } = 1f;

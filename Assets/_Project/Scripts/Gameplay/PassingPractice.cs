@@ -22,6 +22,7 @@ namespace PointPass.Gameplay
         private float attemptAge;
 
         public bool IsRunning { get; private set; }
+        public bool IsFreePlay { get; private set; }
         public int Attempts { get; private set; }
         public int Hits { get; private set; }
         public int ActiveGate { get; private set; }
@@ -44,6 +45,7 @@ namespace PointPass.Gameplay
         public void BeginSession()
         {
             if (ball == null || player == null) return;
+            IsFreePlay = false;
             IsRunning = true; Hits = Attempts = ActiveGate = 0; armed = false;
             player.GetComponent<PlayerMovement>().ResetTo(Vector2.zero, -90f);
             ResetBall();
@@ -54,8 +56,14 @@ namespace PointPass.Gameplay
 
         public void EndSession()
         {
-            IsRunning = armed = false;
+            IsRunning = armed = IsFreePlay = false;
             if (gates != null) gates.gameObject.SetActive(false);
+        }
+
+        public void BeginFreePlay()
+        {
+            BeginSession(); IsFreePlay = true; gates.gameObject.SetActive(false);
+            Feedback = "FREE PLAY  /  MOVE, PASS AND SHOOT AT YOUR OWN PACE"; Refresh();
         }
 
         /// <summary>Explicit practice reset only; passing itself always uses physical ball travel.</summary>
@@ -73,13 +81,14 @@ namespace PointPass.Gameplay
             position.y = Mathf.Clamp(position.y, -MatchConfig.FieldHalfHeight + margin, MatchConfig.FieldHalfHeight - margin);
             ball.ResetTo(position);
             previousBall = position;
-            Feedback = "BALL RESET  /  COLLECT IT AND AIM FOR GATE " + (ActiveGate + 1);
+            Feedback = IsFreePlay ? "FREE PLAY  /  BALL RESET" : "BALL RESET  /  COLLECT IT AND AIM FOR GATE " + (ActiveGate + 1);
             Refresh();
         }
 
         private void OnKicked(PlayerKicker.KickType type)
         {
             if (!IsRunning || !player.IsActive) return;
+            if (IsFreePlay) { armed = false; return; }
             armed = type == PlayerKicker.KickType.Pass;
             previousBall = ball.Body.position;
             attemptAge = 0;
@@ -102,7 +111,7 @@ namespace PointPass.Gameplay
         /// <summary>Observes the physical segment; never changes ball position or velocity.</summary>
         public void Advance(float seconds)
         {
-            if (!IsRunning || ball == null || player == null || !player.IsActive
+            if (!IsRunning || IsFreePlay || ball == null || player == null || !player.IsActive
                 || !ball.Body.simulated || Time.timeScale <= 0f || seconds <= 0f || float.IsNaN(seconds) || float.IsInfinity(seconds)) return;
             Vector2 current = ball.Body.position;
             if (armed)
