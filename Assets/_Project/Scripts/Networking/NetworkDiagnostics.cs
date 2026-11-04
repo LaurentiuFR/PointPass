@@ -100,6 +100,9 @@ namespace PointPass.Networking
             if (driver.GetConnectionState(connection) != NetworkConnection.State.Connected) return;
             var connectionStats = driver.GetConnectionStatistics(connection);
             var driverStats = driver.GetStatistics();
+            // UTP's cumulative reliable-pipeline proxy includes resends caused by delay.
+            // It is not an independent measurement of IP packet loss; snapshot gaps
+            // separately measure missing gameplay state on the receiving client.
             PacketLossPercent = connectionStats.PacketLossPercent;
             UploadKbps = driverStats.TxBandwidth.Current;
             DownloadKbps = driverStats.RxBandwidth.Current;

@@ -17,6 +17,7 @@ namespace PointPass.Core
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Run()
         {
+            if (PointPass.Server.OnlineMatchWorker.TryStart()) return;
             if (PointPass.Networking.NetworkDevelopmentBootstrap.TryStart()) return;
             Scene scene = SceneManager.GetActiveScene();
 
@@ -49,7 +50,9 @@ namespace PointPass.Core
 
             manager.Init(ball, possession, roster, hud);
             root.gameObject.AddComponent<PointPass.Audio.FootballAudio>().Init(ball, roster, manager, possession);
-            manager.SetMenu(MatchMenu.Create());
+            MatchMenu menu = MatchMenu.Create();
+            manager.SetMenu(menu);
+            PointPass.Online.OnlinePilotClient.Attach(root.gameObject, menu);
         }
 
         // Removes leftovers from hand-built scenes. Keeps cameras, lights and the EventSystem.
@@ -88,22 +91,8 @@ namespace PointPass.Core
 
         internal static Ball CreateBall(Transform root)
         {
-            GameObject go = new GameObject("Ball");
-            go.transform.SetParent(root, false);
-
-            Rigidbody2D body = go.AddComponent<Rigidbody2D>();
-            body.gravityScale = 0f;
-            body.mass = 0.2f;
-            body.linearDamping = MatchConfig.PitchBallDamping;
-            body.angularDamping = 1f;
-            body.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
-            body.interpolation = RigidbodyInterpolation2D.Interpolate;
-
-            CircleCollider2D collider = go.AddComponent<CircleCollider2D>();
-            collider.radius = MatchConfig.BallDiameter * 0.5f;
-            collider.sharedMaterial = new PhysicsMaterial2D("Ball") { bounciness = 0.6f, friction = 0f };
-
-            Ball ball = go.AddComponent<Ball>();
+            Ball ball = PhysicsActorFactory.CreateBall(root);
+            GameObject go = ball.gameObject;
 
             Vector2 ballSize = Vector2.one * MatchConfig.BallDiameter;
             go.AddComponent<StadiumShadow>().Init(0.4f, 0.12f, 2);
@@ -116,24 +105,8 @@ namespace PointPass.Core
         internal static PlayerController CreatePlayer(
             Transform root, Team team, Ball ball, PossessionSystem possession, Vector2 kickoffPosition, float kickoffAngle)
         {
-            GameObject go = new GameObject("Player");
-            go.transform.SetParent(root, false);
-
-            Rigidbody2D body = go.AddComponent<Rigidbody2D>();
-            body.gravityScale = 0f;
-            body.mass = 1f;
-            body.linearDamping = 0f;
-            body.freezeRotation = true;
-            body.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
-            body.interpolation = RigidbodyInterpolation2D.Interpolate;
-
-            CircleCollider2D collider = go.AddComponent<CircleCollider2D>();
-            collider.radius = MatchConfig.PlayerColliderRadius;
-
-            go.AddComponent<PlayerMovement>();
-            PlayerController controller = go.AddComponent<PlayerController>();
-            controller.Init(team, kickoffPosition, kickoffAngle);
-            go.transform.position = kickoffPosition;
+            PlayerController controller = PhysicsActorFactory.CreatePlayer(root, team, kickoffPosition, kickoffAngle);
+            GameObject go = controller.gameObject;
 
             Vector2 size = Vector2.one * MatchConfig.PlayerDiameter;
             Color teamColor = team == Team.Blue ? MatchConfig.BlueTeam : MatchConfig.RedTeam;

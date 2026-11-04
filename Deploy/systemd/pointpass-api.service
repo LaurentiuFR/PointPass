@@ -1,0 +1,44 @@
+[Unit]
+Description=PointPass private-pilot API
+After=network.target postgresql@18-main.service
+Requires=postgresql@18-main.service
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=pointpassapi
+Group=pointpassapi
+WorkingDirectory=/opt/pointpass/current/api
+EnvironmentFile=/etc/pointpass/api.env
+ExecStart=/usr/bin/dotnet /opt/pointpass/current/api/PointPass.Api.dll
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+KillSignal=SIGTERM
+UMask=0077
+StateDirectory=pointpass-api
+StateDirectoryMode=0700
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+AmbientCapabilities=
+ReadWritePaths=/var/lib/pointpass-api
+MemoryHigh=384M
+MemoryMax=512M
+CPUQuota=100%
+TasksMax=128
+LimitNOFILE=1024
+LogRateLimitIntervalSec=30s
+LogRateLimitBurst=100
+
+[Install]
+WantedBy=multi-user.target

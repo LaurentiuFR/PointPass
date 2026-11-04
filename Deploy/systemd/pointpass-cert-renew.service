@@ -1,0 +1,14 @@
+[Unit]
+Description=Renew PointPass six-day IP certificate
+After=network-online.target nginx.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/pointpass-certbot/bin/certbot renew --quiet --cert-name pointpass-ip
+UMask=0077
+TimeoutStartSec=10m
+MemoryMax=256M
+CPUQuota=50%
+PrivateTmp=yes
+ProtectHome=yes

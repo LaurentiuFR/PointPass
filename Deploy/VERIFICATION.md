@@ -1,0 +1,45 @@
+# Deployment verification record
+
+This is an intermediate, measured record from **4 November 2026, 11:36 UTC**. A configured room capacity does not establish tested gameplay capacity. Windows gameplay and active-match measurements must be recorded separately before the pilot is called complete.
+
+## Applied and verified
+
+- Existing Ubuntu 26.04.1 x86_64 host retained. No replacement machine, paid add-on, domain or external database was provisioned.
+- API and Linux dedicated worker are active in release `/opt/pointpass/releases/20261104T113240384738482Z`, under separate `pointpassapi` and `pointpassmatch` service accounts. PostgreSQL's actual process runs as `postgres`.
+- Public HTTPS health returns `200` with protocol `PointPass-Online-1`. Windows curl validates the ordinary trusted certificate without overrides. The certificate's IP SAN/chain also pass OpenSSL validation; it expires **10 November 2026 at 14:52:11 UTC**.
+- The API binds only `127.0.0.1:5000`; PostgreSQL has no TCP listener. External connection attempts to TCP 5432, 5000 and 5001 fail. Public `/internal/security-counters` returns 404 and unauthenticated `/v1/profile` returns 401.
+- The firewall permits only TCP 22, 80 and 443, plus UDP 7777. Its initial rollout used a five-minute rollback timer; a new independent SSH connection succeeded before that timer was cancelled. SSH account, root-login and password policy were left unchanged at the owner's request.
+- The fresh Linux dedicated build starts with a null graphics device. Its detailed build report has zero errors and excludes the project's presentation assets. Before opening UDP publicly, actual loopback DTLS negotiated **DTLS 1.2 / ECDHE-RSA-CHACHA20-POLY1305** and passed normal CA and IP-identity verification. Repeating the check against the wrong identity `192.0.2.1` fails with IP-address mismatch.
+- The worker acknowledged its initial certificate reload marker while idle. The certificate check, six-hour renewal and daily backup timers are active. Recent renewal checks completed with the current certificate not yet due; forced production renewal was not attempted.
+
+## Backend and persistence checks
+
+The guarded test executable ran against the isolated `pointpass_validation` database and a temporary API on loopback port 5001. It completed **45 checks**, followed by **15 after service restart**; the latter repeat 13 pure checks and add two actual persistence checks. This is **47 distinct checks**, covering strict input handling, identity isolation, invitation admission, version/capacity limits, ticket expiry/reuse, reconnects, trusted/idempotent results and history. It also verifies recovery when a ticket redemption commits but its HTTP response is ignored: only the trusted heartbeat exposes the connection identity needed for cleanup.
+
+The temporary API was stopped, its protected environment/persistence fixture was removed, and the specifically named disposable validation database was dropped. No fake match worker was registered against the production database.
+
+A production database dump was restored successfully into a separate disposable database, then that restore database was removed. This baseline dump contained **zero production profiles**; guest/result persistence across an API restart was established in the isolated test database. A backup containing real pilot participants should be checked again after gameplay validation.
+
+## Idle measurements
+
+The 60-second sample began at **11:33:52 UTC**, shortly after the new services started. CPU percentages below are relative to **one logical CPU**, not the whole four-vCPU host.
+
+| Process | Average process CPU | Average process RSS | Cgroup memory at sample end |
+| --- | ---: | ---: | ---: |
+| Unity worker | 1.77% | 116.4 MiB | 77.4 MiB |
+| API | 1.45% | 95.4 MiB | 36.4 MiB |
+| PostgreSQL parent | 0.00% | 30.2 MiB | 44.8 MiB for the database service |
+
+RSS includes shared mappings and must not be added to cgroup memory as a second allocation. The API sample includes its first minute of database/worker traffic and warm-up. Across consecutive worker summaries, `peers`, simulated seconds, commands, snapshots and game payload bytes all remained **zero**. There was no idle football simulation.
+
+At this baseline the production database occupied 8,222,399 bytes; releases occupied approximately 91 MiB, backups less than 1 MiB, and the shared system journal approximately 48 MiB. These are snapshots, not measured long-term growth. Interface traffic includes deployment, SSH and API traffic, so it does not establish bandwidth per player.
+
+## Still pending at this checkpoint
+
+- Actual Windows Unity-transport checks, two authenticated Windows players, full gameplay, disconnect/rejoin and a verified completed match.
+- Active-match CPU/RAM, per-player bandwidth, simulation timing and storage growth; tested concurrent gameplay capacity remains unestablished.
+- A renewal dry run after the CA's documented staging maintenance ends on 4 November at 21:00 UTC; no certificate-validation bypass was used during the outage.
+- A verified recovery administration account and later SSH hardening, if the owner chooses to proceed.
+- Android/iOS device validation; no phone testing has occurred.
+
+Invitations remain in private server files. They were not copied into the repository, client build, chat or audit bundle. Non-secret evidence is stored locally under `Logs/OnlinePilotVerification/Remote`, including the deployment status, backend checks, correct/wrong-identity DTLS results, worker journal and idle resource sample.

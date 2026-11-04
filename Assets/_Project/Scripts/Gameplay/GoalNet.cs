@@ -28,13 +28,14 @@ namespace PointPass.Gameplay
         public float Side => sign;
         public event System.Action<Vector2, float> Impacted;
 
-        public static GoalNet Create(Transform parent, float side)
+        public static GoalNet Create(Transform parent, float side, bool presentation = true)
         {
             GameObject root = new GameObject(side < 0 ? "GoalLeft" : "GoalRight");
             root.transform.SetParent(parent, false);
             GoalNet net = root.AddComponent<GoalNet>();
             net.sign = Mathf.Sign(side);
-            net.Build();
+            if (presentation) net.Build();
+            else net.enabled = false; // Collision absorption remains callable without presentation updates.
             return net;
         }
 
@@ -125,6 +126,7 @@ namespace PointPass.Gameplay
         {
             if (speed < 0.15f) return;
             Impacted?.Invoke(localPoint, speed);
+            if (mesh == null) return;
             Vector2 direction = Mathf.Abs(localPoint.y) > MatchConfig.GoalWidth * 0.5f - 0.1f
                 ? Vector2.up * Mathf.Sign(localPoint.y) : Vector2.right * sign;
             ImpactStrength = Mathf.Clamp(speed * 0.024f, 0f, 0.38f);

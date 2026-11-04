@@ -1,0 +1,12 @@
+[Unit]
+Description=Check PointPass trusted IP certificate lifetime
+After=pointpass-cert-renew.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/pointpass/bin/certificate-expiry-check.sh
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+MemoryMax=64M

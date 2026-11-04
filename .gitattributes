@@ -13,3 +13,7 @@
 *.fbx filter=lfs diff=lfs merge=lfs -text
 *.ttf filter=lfs diff=lfs merge=lfs -text
 *.otf filter=lfs diff=lfs merge=lfs -text
+*.sh text eol=lf
+*.sql text eol=lf
+*.service text eol=lf
+*.timer text eol=lf

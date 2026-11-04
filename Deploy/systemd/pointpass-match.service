@@ -1,0 +1,44 @@
+[Unit]
+Description=PointPass single authoritative 1v1 match worker
+After=network-online.target pointpass-api.service
+Wants=network-online.target pointpass-api.service
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=pointpassmatch
+Group=pointpassmatch
+WorkingDirectory=/opt/pointpass/current/match
+EnvironmentFile=/etc/pointpass/match.env
+ExecStart=/opt/pointpass/current/match/PointPassServer.x86_64 -batchmode -nographics -pointpassServer -logFile -
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=25
+KillSignal=SIGTERM
+UMask=0077
+StateDirectory=pointpass-match
+StateDirectoryMode=0700
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+AmbientCapabilities=
+ReadWritePaths=/var/lib/pointpass-match
+MemoryHigh=1536M
+MemoryMax=2048M
+CPUQuota=200%
+TasksMax=256
+LimitNOFILE=1024
+LogRateLimitIntervalSec=30s
+LogRateLimitBurst=100
+
+[Install]
+WantedBy=multi-user.target

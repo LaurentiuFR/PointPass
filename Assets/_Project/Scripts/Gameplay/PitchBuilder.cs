@@ -15,12 +15,6 @@ namespace PointPass.Gameplay
             Transform pitch = new GameObject("Pitch").transform;
             pitch.SetParent(root, false);
 
-            float fw = MatchConfig.FieldHalfWidth;   // x of the side lines
-            float fh = MatchConfig.FieldHalfHeight;  // y of the touchlines
-            float goalWidth = MatchConfig.GoalWidth;
-            float goalDepth = MatchConfig.GoalDepth;
-            float t = 1f; // wall thickness
-
             // Surrounds and markings are presentation only; the existing colliders below are unchanged.
             StadiumBuilder.Build(pitch);
             SpriteRenderer turf = SpriteLibrary.Create(pitch, "Surface", "grass_stadium",
@@ -30,6 +24,26 @@ namespace PointPass.Gameplay
             // Separate floor, overhead mesh and frame; players and ball sit under the netting.
             GoalNet leftNet = GoalNet.Create(pitch, -1f);
             GoalNet rightNet = GoalNet.Create(pitch, 1f);
+            BuildColliders(pitch, leftNet, rightNet, onGoal);
+        }
+
+        /// <summary>The same walls, goal triggers and net response, without any rendered assets.</summary>
+        public static void BuildPhysics(Transform root, Action<Team> onGoal)
+        {
+            Transform pitch = new GameObject("PitchPhysics").transform;
+            pitch.SetParent(root, false);
+            GoalNet leftNet = GoalNet.Create(pitch, -1f, presentation: false);
+            GoalNet rightNet = GoalNet.Create(pitch, 1f, presentation: false);
+            BuildColliders(pitch, leftNet, rightNet, onGoal);
+        }
+
+        private static void BuildColliders(Transform pitch, GoalNet leftNet, GoalNet rightNet, Action<Team> onGoal)
+        {
+            float fw = MatchConfig.FieldHalfWidth;
+            float fh = MatchConfig.FieldHalfHeight;
+            float goalWidth = MatchConfig.GoalWidth;
+            float goalDepth = MatchConfig.GoalDepth;
+            float t = 1f;
 
             // Top and bottom walls (inner face on the touchline)
             float topWidth = 2f * (fw + goalDepth + t);

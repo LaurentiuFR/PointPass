@@ -29,6 +29,7 @@ namespace PointPass.Players
         private Ball ball;
         private PossessionSystem possession;
         private PlayerAnimator animator;
+        private SimulationStride simulationStride;
         private PlayerController controller;
         private PlayerMovement movement;
         private Rigidbody2D body;
@@ -54,6 +55,7 @@ namespace PointPass.Players
             movement = GetComponent<PlayerMovement>();
             body = GetComponent<Rigidbody2D>();
             ownCollider = GetComponent<Collider2D>();
+            simulationStride = GetComponent<SimulationStride>();
         }
 
         private void FixedUpdate()
@@ -157,8 +159,8 @@ namespace PointPass.Players
         // The spot the ball is steered toward, in world space.
         private Vector2 FeetTarget()
         {
-            float phase = animator != null ? animator.Phase : 0f;
-            float intensity = animator != null ? animator.Intensity : 0f;
+            float phase = animator != null ? animator.Phase : simulationStride != null ? simulationStride.Phase : 0f;
+            float intensity = animator != null ? animator.Intensity : simulationStride != null ? simulationStride.Intensity : 0f;
 
             // Push peaks each time a boot is furthest forward (twice per stride cycle).
             float lead = baseLead + touchLead * intensity * -Mathf.Cos(2f * phase);

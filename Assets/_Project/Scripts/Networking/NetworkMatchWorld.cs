@@ -20,6 +20,7 @@ namespace PointPass.Networking
         private readonly uint[] kickSerials = new uint[2];
         private readonly PlayerKicker.KickType[] lastKicks = new PlayerKicker.KickType[2];
         private readonly ulong remoteId;
+        private readonly int localSlot;
         private readonly PointPass.Audio.FootballAudio audio;
         private int presentedReset;
         private int presentedGoals;
@@ -28,8 +29,12 @@ namespace PointPass.Networking
         private int lastPresentedBlue;
 
         public NetworkMatchWorld(NetworkSession session, bool server, ulong remoteId)
+            : this(session.SendInput, server, remoteId, server ? 0 : 1) { }
+
+        public NetworkMatchWorld(System.Action<NetworkInputCommand> sendInput, bool server, ulong remoteId, int localSlot)
         {
             this.remoteId = remoteId;
+            this.localSlot = localSlot;
             Root = new GameObject("NetworkMatch").transform;
             MatchManager manager = server ? Root.gameObject.AddComponent<MatchManager>() : null;
             PitchBuilder.Build(Root, team => { if (manager != null) manager.OnGoal(team); });
@@ -44,7 +49,6 @@ namespace PointPass.Networking
             }
             Hud = MatchHud.Create();
             Hud.transform.SetParent(Root, false);
-            int localSlot = server ? 0 : 1;
             if (server)
             {
                 Simulation = manager;
@@ -65,7 +69,7 @@ namespace PointPass.Networking
                     player.Body.interpolation = RigidbodyInterpolation2D.None;
                     player.GetComponent<PlayerAnimator>().SetReplicatedMotion(Vector2.zero);
                 }
-                ClientInput = new NetworkPlayerInput(session, Players[localSlot]);
+                ClientInput = new NetworkPlayerInput(sendInput, Players[localSlot]);
                 Players[localSlot].CommandSink = ClientInput;
             }
             Players[localSlot].gameObject.AddComponent<PlayerAimGuide>().Init(Ball);
@@ -143,7 +147,7 @@ namespace PointPass.Networking
             PlayerController owner = state.OwnerSlot >= 0 ? Players[state.OwnerSlot] : null;
             if (Possession.Owner != owner) { Possession.Clear(); if (owner != null) Possession.TryAcquire(owner); }
             ClientInput.IsActive = state.Playing;
-            ClientInput.SetState(state.Red);
+            ClientInput.SetState(localSlot == 0 ? state.Blue : state.Red);
             Hud.SetScore(state.BlueScore, state.RedScore);
             if (state.FullTime) Hud.SetClockText("FULL TIME");
             else Hud.SetClock(state.Overtime ? "GOLDEN GOAL" : state.Half == 1 ? "1ST HALF" : "2ND HALF", state.Clock);

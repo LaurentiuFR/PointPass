@@ -1,0 +1,17 @@
+[Unit]
+Description=Bounded PointPass PostgreSQL backup
+After=postgresql@18-main.service
+Requires=postgresql@18-main.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/pointpass/bin/backup.sh
+Nice=15
+IOSchedulingClass=idle
+UMask=0077
+TimeoutStartSec=10m
+MemoryMax=256M
+CPUQuota=50%
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes

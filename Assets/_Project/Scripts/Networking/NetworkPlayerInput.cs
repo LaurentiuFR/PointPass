@@ -6,7 +6,7 @@ namespace PointPass.Networking
     /// <summary>Local intent only. Charge, possession and kick execution remain on the server.</summary>
     public sealed class NetworkPlayerInput : IPlayerCommandSink
     {
-        private readonly NetworkSession session;
+        private readonly System.Action<NetworkInputCommand> send;
         private readonly PlayerController controller;
         private NetworkInputCommand command;
         private NetworkPlayerState state;
@@ -17,7 +17,9 @@ namespace PointPass.Networking
         public float ShotCurve => state.Curve;
 
         public NetworkPlayerInput(NetworkSession session, PlayerController controller)
-        { this.session = session; this.controller = controller; }
+            : this(session.SendInput, controller) { }
+        public NetworkPlayerInput(System.Action<NetworkInputCommand> send, PlayerController controller)
+        { this.send = send; this.controller = controller; }
         public void SetState(NetworkPlayerState value) { state = value; }
         public void SetMove(Vector2 direction)
         {
@@ -52,7 +54,7 @@ namespace PointPass.Networking
         {
             command.Sequence++;
             command.Action = action;
-            session.SendInput(command);
+            send(command);
         }
     }
 }

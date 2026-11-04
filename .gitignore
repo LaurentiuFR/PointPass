@@ -25,6 +25,7 @@
 ExportedObj/
 .consulo/
 *.csproj
+!/Backend/**/*.csproj
 *.unityproj
 *.sln
 *.slnx
@@ -74,3 +75,10 @@ local.properties
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# Online pilot build outputs and protected configuration
+/Backend/**/bin/
+/Backend/**/obj/
+*.protected
+*.env
+*.pem
