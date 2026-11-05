@@ -27,6 +27,14 @@ The real `certbot renew --dry-run --cert-name pointpass-ip --non-interactive` co
 
 Separate actual Windows Unity/NGO probes reached ticket rejection with the correct trusted IP, rejected a wrong TLS name before admission, then recovered with the correct identity. No real ticket/invitation was used; continued gameplay is a separate check. Evidence: `Logs/OnlinePilotVerification/encrypted-admission-tests.txt`. No TLS/HTTPS bypass was used.
 
+## Backups and retention (item 9)
+
+**PASS, live drill at 5 November 11:24 UTC.** A new dump from the running production database restored successfully into the script's uniquely named disposable database: two profiles and two verified results. That restore database was removed; the pilot database was not overwritten. The private backup directory is root0700 and all six current dumps are root0600, approximately 29–31 KiB compressed each, with no partial dump and no dump above 1 GiB.
+
+The deployed backup policy retains at most seven successful dumps, limits each with the kernel 1 GiB file-size guard, and checks free space; the daily backup timer's latest run succeeded. This run did not create synthetic production backups merely to evict old restore points. Journal configuration is 256 MiB/seven days (current usage 47.3 MiB); active logrotate timer and debug inspection confirmed daily seven-rotation application/certificate policies. `maxsize` is evaluated when logrotate runs, not a hard instantaneous active-log quota. Frequent manual/pre-deploy backups can replace older daily points within the seven-dump policy.
+
+Evidence: `Logs/OnlinePilotVerification/CurrentAudit/backup-restore.txt`. Dumps are on the same SSD and do not survive server loss/account compromise. Off-host storage requires an approved destination/cost; no paid storage was enabled.
+
 ## Cost summary (item 10)
 
 The owner reports 10.19/month plus usage costs. `Deploy/COSTS.md` records official traffic/storage/IPv4 terms without assuming the invoice currency, VAT, legacy tariff or whether IPv4 is already included. The exact billed total needs the account invoice/usage. No purchases, paid backups, snapshots, resizing or add-ons were enabled.
