@@ -8,6 +8,10 @@ At 11:01–11:05 UTC, pinned SSH access confirmed the required host fingerprint,
 
 The older checkpoint below is retained as historical evidence and will not be treated as newly verified. Current remaining items are tracked in `ONLINE_PILOT_HANDOFF.md`.
 
+## Cost summary (item 10)
+
+The owner reports 10.19/month plus usage costs. `Deploy/COSTS.md` records official traffic/storage/IPv4 terms without assuming the invoice currency, VAT, legacy tariff or whether IPv4 is already included. The exact billed total needs the account invoice/usage. No purchases, paid backups, snapshots, resizing or add-ons were enabled.
+
 ## Historical checkpoint
 
 This is an intermediate, measured record from **4 November 2026, 11:36 UTC**. A configured room capacity does not establish tested gameplay capacity. Windows gameplay and active-match measurements must be recorded separately before the pilot is called complete.

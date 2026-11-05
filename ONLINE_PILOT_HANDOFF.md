@@ -37,7 +37,7 @@ Prior implementation/deployment claims below are historical until rechecked. Cur
 | 6. Certificates | Live HTTPS trusted; renewal/reload/expiry drill pending. |
 | 7–8. Idle/active resources/capacity | Worker currently peers=0 with stable simulation counter; measured samples pending. No capacity claim beyond one configured room. |
 | 9. Backups/retention | Static scripts reviewed; live restore/retention pending. |
-| 10. Costs | Owner reports 10.19/month plus usage charges; currency, VAT and IPv4 inclusion unconfirmed. Current cost document under review. |
+| 10. Costs | **PASS, documented** in `Deploy/COSTS.md`: owner-reported 10.19/month plus usage charges, published EU traffic/IPv4/optional-storage terms and explicit unknown currency/VAT/account tariff. No paid add-ons enabled. |
 | 11. Regressions | Local suites being rerun; record exact fresh outcomes before marking complete. |
 | 12. Invitations/Git | Server currently has 2 consumed, 1 unused invitation; do not revoke an owner invitation. Reachable Git scan found no matching secret/generated files; ignore hardening under review. |
 | 13. Compatibility | Static audit: operational/test-only changes retain `PointPass-Online-1` / wire1. Recheck final changes before completion. |
