@@ -19,6 +19,14 @@ The older checkpoint below is retained as historical evidence and will not be tr
 | Public `/internal/security-counters` | 404 |
 | Wrong-IP HTTPS identity routed to the same host | Rejected by Schannel, curl exit 60 (`SEC_E_WRONG_PRINCIPAL`); no bypass |
 
+## Certificate lifecycle (item 6)
+
+**PASS, live on 5 November.** `/opt/pointpass-certbot/bin/certbot --version` is 5.8.0, satisfying the IP/webroot requirement independently of the distro package. The current trusted Let's Encrypt YR2 certificate is valid until 10 November 2026 14:52:11 UTC. OpenSSL OS-root chain/IP verification and the deployed expiry guard passed. The worker certificate matches the current lineage; protected TLS/config permissions remain 0700/0600 as appropriate.
+
+The real `certbot renew --dry-run --cert-name pointpass-ip --non-interactive` completed successfully against staging. It did not replace the trusted production certificate or disable validation. After checking no waiting/active match and taking the audit lock, the existing deployment hook validated/redeployed the current lineage, Nginx reloaded, and the worker acknowledged its marker while idle. API, worker and Nginx remained active. Renewal (six-hour timer), daily expiry check and latest timer executions reported success. Evidence: `Logs/OnlinePilotVerification/CurrentAudit/certificate-drill.txt`.
+
+Separate actual Windows Unity/NGO probes reached ticket rejection with the correct trusted IP, rejected a wrong TLS name before admission, then recovered with the correct identity. No real ticket/invitation was used; continued gameplay is a separate check. Evidence: `Logs/OnlinePilotVerification/encrypted-admission-tests.txt`. No TLS/HTTPS bypass was used.
+
 ## Cost summary (item 10)
 
 The owner reports 10.19/month plus usage costs. `Deploy/COSTS.md` records official traffic/storage/IPv4 terms without assuming the invoice currency, VAT, legacy tariff or whether IPv4 is already included. The exact billed total needs the account invoice/usage. No purchases, paid backups, snapshots, resizing or add-ons were enabled.

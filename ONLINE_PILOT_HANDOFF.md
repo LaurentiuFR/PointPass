@@ -34,7 +34,7 @@ Prior implementation/deployment claims below are historical until rechecked. Cur
 | 3. Separate security/transport checks | HTTPS `/health` 200 with default OS trust; remaining separate cases pending current run. |
 | 4. Restart persistence | Two existing profiles observed; controlled restart verification pending an idle check. |
 | 5. Exposure | **PASS, live**: UFW default-deny and `ss` expose only application TCP22/80/443 + UDP7777; API stays loopback5000, PostgreSQL has no TCP listener. External TCP22/80/443 connected; 5000/5001/5432 closed/filtered. Public internal route is 404, unauthenticated profile 401. |
-| 6. Certificates | Live HTTPS trusted; renewal/reload/expiry drill pending. |
+| 6. Certificates | **PASS, live**: Certbot 5.8.0, normal OS trust/IP checks, wrong-IP/name rejection, successful staging renewal dry run, idle deploy-hook/reload acknowledgement and expiry guard. Unity/NGO negative-admission/recovery probes also passed without credentials or validation bypass. |
 | 7–8. Idle/active resources/capacity | Worker currently peers=0 with stable simulation counter; measured samples pending. No capacity claim beyond one configured room. |
 | 9. Backups/retention | Static scripts reviewed; live restore/retention pending. |
 | 10. Costs | **PASS, documented** in `Deploy/COSTS.md`: owner-reported 10.19/month plus usage charges, published EU traffic/IPv4/optional-storage terms and explicit unknown currency/VAT/account tariff. No paid add-ons enabled. |
