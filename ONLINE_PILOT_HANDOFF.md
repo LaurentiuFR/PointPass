@@ -33,7 +33,7 @@ Prior implementation/deployment claims below are historical until rechecked. Cur
 | 2. Invalid-command counters | Baseline worker aggregate `rejected=489`; category-specific proof still pending. Closing-phase heartbeats must not be mislabelled malformed commands. |
 | 3. Separate security/transport checks | HTTPS `/health` 200 with default OS trust; remaining separate cases pending current run. |
 | 4. Restart persistence | Two existing profiles observed; controlled restart verification pending an idle check. |
-| 5. Exposure | Live `ss` and UFW show TCP22/80/443, UDP7777; API loopback5000, no PostgreSQL TCP listener. External checks pending. |
+| 5. Exposure | **PASS, live**: UFW default-deny and `ss` expose only application TCP22/80/443 + UDP7777; API stays loopback5000, PostgreSQL has no TCP listener. External TCP22/80/443 connected; 5000/5001/5432 closed/filtered. Public internal route is 404, unauthenticated profile 401. |
 | 6. Certificates | Live HTTPS trusted; renewal/reload/expiry drill pending. |
 | 7–8. Idle/active resources/capacity | Worker currently peers=0 with stable simulation counter; measured samples pending. No capacity claim beyond one configured room. |
 | 9. Backups/retention | Static scripts reviewed; live restore/retention pending. |

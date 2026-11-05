@@ -8,6 +8,17 @@ At 11:01–11:05 UTC, pinned SSH access confirmed the required host fingerprint,
 
 The older checkpoint below is retained as historical evidence and will not be treated as newly verified. Current remaining items are tracked in `ONLINE_PILOT_HANDOFF.md`.
 
+## Network exposure (item 5)
+
+**PASS, rechecked from Windows and over pinned SSH on 5 November.** External TCP22/80/443 connected; TCP5000/5001/5432 were closed or filtered with bounded connection probes. Live listeners show the API only at 127.0.0.1:5000, no PostgreSQL TCP listener, Nginx TCP80/443, SSH TCP22 and game UDP7777. Local DNS/NTP/DHCP infrastructure listeners were also observed; they are not additional public application services. UFW is active with default incoming deny and only TCP22/80/443 + UDP7777 application rules for IPv4/IPv6. This combines listener/firewall inspection with targeted external probes, not a claim to have exhaustively scanned every port.
+
+| Separate external check | Result |
+| --- | --- |
+| Default-trust HTTPS `/health` | 200, Online-1 |
+| Unauthenticated `/v1/profile` | 401 |
+| Public `/internal/security-counters` | 404 |
+| Wrong-IP HTTPS identity routed to the same host | Rejected by Schannel, curl exit 60 (`SEC_E_WRONG_PRINCIPAL`); no bypass |
+
 ## Cost summary (item 10)
 
 The owner reports 10.19/month plus usage costs. `Deploy/COSTS.md` records official traffic/storage/IPv4 terms without assuming the invoice currency, VAT, legacy tariff or whether IPv4 is already included. The exact billed total needs the account invoice/usage. No purchases, paid backups, snapshots, resizing or add-ons were enabled.
