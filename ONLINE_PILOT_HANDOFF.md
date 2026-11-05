@@ -4,10 +4,10 @@ This is the entry point for the next coding agent. Read this file, `README.md`, 
 
 ## Workspace and Git
 
-- Implementation worktree: `C:\Dev\PointPass\Logs\OnlineServerIntegration`.
+- Current continuation worktree: `C:\Dev\PointPass` (5 November 2026).
 - Branch: `codex/online-server-integration`, based on `main` commit `6f44996d174259aeb2b1fc7af688b37aaf51a61d`.
-- Work is uncommitted. No commit, push, PR or main merge has been authorized for this pilot. New files have intent-to-add entries solely so the full review diff includes them.
-- Original worktree `C:\Dev\PointPass` remains on `codex/tackling-stamina-mobile-controls` at `cefd938`; its pre-existing settings modifications and `_Recovery` scene were preserved.
+- The owner now authorizes a commit and `git push -u origin codex/online-server-integration` after each completed item. Never merge main or force-push. Stage only explicit reviewed files; exclude secrets and generated folders.
+- The separate menu/gameplay draft remains in local stash `99b13ef623842d8bb5bd8da480593634aad8e2c8`, from `codex/mobile-hud-simplified-menu`. Do not apply or merge it during this online audit. The owner must identify the other agent's branch before a later integration.
 - A friend owns current menu, mobile action-button and magnetic-dribbling changes. This pilot deliberately uses the older main gameplay baseline. Coordinate those changes before merging; do not overwrite their menu or silently introduce unvalidated tackling/stamina network actions.
 - The delivery patch includes Unity-generated metadata and the new empty server scene. Do not invent or hand-edit metadata.
 
@@ -21,6 +21,28 @@ git apply C:/path/to/pointpass-online-pilot.patch
 ```
 
 Read the diff before committing. Integrating a newer menu/gameplay branch is a subsequent review, not an assumption that the patch applies cleanly to it.
+
+
+## Current continuation status — 5 November 2026
+
+Prior implementation/deployment claims below are historical until rechecked. Current access uses the friend's SSH key in place with the exact pinned host fingerprint; no SSH/root policy changes are authorised. Invitations for new automated tests must remain in memory/anonymous pipes, never terminal output, arguments, files or Git. The legacy file-only helper is being adapted before any new invitation is created.
+
+| Item | Current evidence/status |
+| --- | --- |
+| 1. Final match history | **PASS, live read-only SQL**: match `570b1a48-3b81-47d4-ae54-9d9cdca95e8b`, completed 4 Nov 16:27:53 UTC, score 2–1, one match row and one history occurrence in each of two distinct slots. Repeat with `Tools/Validation/Online/AuditHistory.sql`. |
+| 2. Invalid-command counters | Baseline worker aggregate `rejected=489`; category-specific proof still pending. Closing-phase heartbeats must not be mislabelled malformed commands. |
+| 3. Separate security/transport checks | HTTPS `/health` 200 with default OS trust; remaining separate cases pending current run. |
+| 4. Restart persistence | Two existing profiles observed; controlled restart verification pending an idle check. |
+| 5. Exposure | Live `ss` and UFW show TCP22/80/443, UDP7777; API loopback5000, no PostgreSQL TCP listener. External checks pending. |
+| 6. Certificates | Live HTTPS trusted; renewal/reload/expiry drill pending. |
+| 7–8. Idle/active resources/capacity | Worker currently peers=0 with stable simulation counter; measured samples pending. No capacity claim beyond one configured room. |
+| 9. Backups/retention | Static scripts reviewed; live restore/retention pending. |
+| 10. Costs | Owner reports 10.19/month plus usage charges; currency, VAT and IPv4 inclusion unconfirmed. Current cost document under review. |
+| 11. Regressions | Local suites being rerun; record exact fresh outcomes before marking complete. |
+| 12. Invitations/Git | Server currently has 2 consumed, 1 unused invitation; do not revoke an owner invitation. Reachable Git scan found no matching secret/generated files; ignore hardening under review. |
+| 13. Compatibility | Static audit: operational/test-only changes retain `PointPass-Online-1` / wire1. Recheck final changes before completion. |
+
+No service restart, production configuration change, or full gameplay test has occurred in this continuation at this checkpoint. Menu, HUD, tackling, stamina and dribbling are out of scope. Phone/touch/second-PC testing remains untested.
 
 ## Implemented architecture
 

@@ -1,5 +1,15 @@
 # Deployment verification record
 
+## Live continuation — 5 November 2026
+
+At 11:01–11:05 UTC, pinned SSH access confirmed the required host fingerprint, Ubuntu 26.04.1 and active API/match/PostgreSQL/Nginx services. No service was restarted. There was no open match, pending result outbox or other interactive root session.
+
+**Item 1 passed:** a read-only transaction verified final match `570b1a48-3b81-47d4-ae54-9d9cdca95e8b` is completed 2–1 exactly once, with one history occurrence for slot 0 and one for slot 1. The completion timestamp is 4 November 2026 16:27:53.381579 UTC. The reusable assertion is `Tools/Validation/Online/AuditHistory.sql`; secret-free local evidence is `Logs/OnlinePilotVerification/CurrentAudit/history-proof.txt`. This proves persistence/uniqueness, not a fresh manual gameplay test.
+
+The older checkpoint below is retained as historical evidence and will not be treated as newly verified. Current remaining items are tracked in `ONLINE_PILOT_HANDOFF.md`.
+
+## Historical checkpoint
+
 This is an intermediate, measured record from **4 November 2026, 11:36 UTC**. A configured room capacity does not establish tested gameplay capacity. Windows gameplay and active-match measurements must be recorded separately before the pilot is called complete.
 
 ## Applied and verified
