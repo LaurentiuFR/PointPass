@@ -1,5 +1,5 @@
 using UnityEngine;
-#if UNITY_SERVER
+#if UNITY_SERVER || UNITY_EDITOR
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -9,6 +9,8 @@ using PointPass.Networking;
 using PointPass.Online;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
+using Unity.Profiling;
+using Unity.Profiling.LowLevel.Unsafe;
 #endif
 
 namespace PointPass.Server
@@ -26,7 +28,8 @@ namespace PointPass.Server
 #endif
         }
 
-#if UNITY_SERVER
+#if UNITY_SERVER || UNITY_EDITOR
+        private enum Rejection { Admission, Malformed, Ordering, Action, Rate, Probe, UnknownPeer }
         private sealed class Peer
         {
             public string PlayerId;
@@ -46,7 +49,15 @@ namespace PointPass.Server
         private uint sequence;
         private int pendingApprovals;
         private double nextSnapshot, missingSince = -1, lastApiSuccess, nextSummary, simulationSeconds;
-        private long commands, rejected, bytesSent, snapshots;
+        private long commands, rejected, bytesSent, bytesReceived, snapshots, activeFixedSteps;
+        private long admissionRejected, malformedRejected, orderingRejected, actionRejected, rateRejected, probeRejected, unknownPeerRejected;
+        private long waitingHeartbeatsIgnored, closingHeartbeatsIgnored;
+        private readonly long[] inputBytesReceivedBySlot = new long[2], probeBytesReceivedBySlot = new long[2];
+        private readonly long[] stateBytesSentBySlot = new long[2], probeBytesSentBySlot = new long[2];
+        private double summaryAt, previousFrameAt, frameSecondsSum, frameSecondsPeak;
+        private long frameSamples, previousStepCount;
+        private ProfilerRecorder physicsRecorder;
+        private long physicsFrameSamples, physicsCalls, physicsNanosecondsSum, physicsNanosecondsPeak;
         private bool stopping, submitting, registering, apiHealthy;
         private Coroutine heartbeat;
         private bool departureSending;
@@ -110,6 +121,9 @@ namespace PointPass.Server
 
         private void StartTransport()
         {
+            StartPhysicsRecorder();
+            summaryAt = Time.realtimeSinceStartupAsDouble; previousFrameAt = 0;
+            previousStepCount = activeFixedSteps; nextSummary = 0;
             var root = new GameObject("Dedicated encrypted transport");
             transport = root.AddComponent<UnityTransport>();
             transport.UseEncryption = true;
@@ -134,12 +148,12 @@ namespace PointPass.Server
             response.Approved = false;
             response.Reason = "Admission unavailable. Obtain a fresh ticket and retry.";
             if (stopping || !apiHealthy || departures.Count >= 16 || pendingApprovals >= 2 || peers.Count + pendingApprovals >= 2
-                || request.Payload == null || request.Payload.Length > 256 || request.Payload.Length < 60) { rejected++; return; }
+                || request.Payload == null || request.Payload.Length > 256 || request.Payload.Length < 60) { Reject(Rejection.Admission); return; }
             OnlineApiContracts.Approval payload = null;
             try { payload = JsonUtility.FromJson<OnlineApiContracts.Approval>(new UTF8Encoding(false, true).GetString(request.Payload)); }
             catch (Exception exception) when (exception is ArgumentException || exception is DecoderFallbackException) { }
             if (payload == null || payload.gameVersion != OnlineProtocol.GameVersion || !ValidTicket(payload.ticket))
-            { response.Reason = "Invalid ticket or incompatible game version."; rejected++; return; }
+            { response.Reason = "Invalid ticket or incompatible game version."; Reject(Rejection.Admission); return; }
             response.Pending = true;
             pendingApprovals++;
             StartCoroutine(Redeem(request.ClientNetworkId, payload, response));
@@ -164,7 +178,7 @@ namespace PointPass.Server
             }
             else
             {
-                rejected++;
+                Reject(Rejection.Admission);
                 if (error == null && admitted != null)
                 {
                     if (matchId == null) matchId = admitted.matchId;
@@ -207,6 +221,7 @@ namespace PointPass.Server
         {
             if (network == null || stopping) return;
             double now = Time.unscaledTimeAsDouble;
+            RecordFrameMetrics(Time.realtimeSinceStartupAsDouble);
             if (!departureSending && departures.Count > 0 && now >= nextDeparture) StartCoroutine(SendDeparture());
             if (now - lastApiSuccess > 30 && !registering) { apiHealthy = false; Time.timeScale = 0; }
             if (matchId != null && missingSince >= 0 && now - missingSince >= 30 && !submitting)
@@ -227,8 +242,12 @@ namespace PointPass.Server
                         snapshot.Message = missingSince >= 0 ? "Waiting for opponent to reconnect (30 seconds)…" : "Test service unavailable. Match paused.";
                     }
                     byte[] state = OnlineProtocol.EncodeState(snapshot);
-                    foreach (ulong client in peers.Keys)
-                        if (network.ConnectedClients.ContainsKey(client)) { OnlineProtocol.Send(network, OnlineProtocol.StateMessage, client, state, NetworkDelivery.UnreliableSequenced); bytesSent += state.Length; }
+                    foreach (var peer in peers)
+                        if (network.ConnectedClients.ContainsKey(peer.Key))
+                        {
+                            OnlineProtocol.Send(network, OnlineProtocol.StateMessage, peer.Key, state, NetworkDelivery.UnreliableSequenced);
+                            RecordPayloadSent(peer.Value.Slot, state.Length, false);
+                        }
                     snapshots++;
                 }
             }
@@ -236,11 +255,85 @@ namespace PointPass.Server
             if (now >= nextSummary)
             {
                 nextSummary = now + 60;
-                Debug.Log($"[PointPass Worker] metrics peers={peers.Count} simulatedSeconds={simulationSeconds:F1} commands={commands} rejected={rejected} snapshots={snapshots} payloadBytesSent={bytesSent}");
+                WriteMetrics(Time.realtimeSinceStartupAsDouble);
             }
         }
 
-        private void FixedUpdate() { simulationSeconds += Time.fixedDeltaTime; }
+        private void FixedUpdate()
+        {
+            // This counts enabled match-physics callbacks, including ball/net settling.
+            // It is not a measurement of the CPU time spent in the physics engine.
+            if (world == null || !world.Ball.Body.simulated || Time.timeScale <= 0 || submitting) return;
+            activeFixedSteps++; simulationSeconds += Time.fixedDeltaTime;
+        }
+
+        private void Reject(Rejection reason)
+        {
+            rejected++;
+            switch (reason)
+            {
+                case Rejection.Admission: admissionRejected++; break;
+                case Rejection.Malformed: malformedRejected++; break;
+                case Rejection.Ordering: orderingRejected++; break;
+                case Rejection.Action: actionRejected++; break;
+                case Rejection.Rate: rateRejected++; break;
+                case Rejection.Probe: probeRejected++; break;
+                case Rejection.UnknownPeer: unknownPeerRejected++; break;
+            }
+        }
+        private void RecordPayloadSent(int slot, int bytes, bool probe)
+        {
+            bytesSent += bytes;
+            if (probe) probeBytesSentBySlot[slot] += bytes;
+            else stateBytesSentBySlot[slot] += bytes;
+        }
+        private void StartPhysicsRecorder()
+        {
+            if (physicsRecorder.Valid) return;
+            var handles = new List<ProfilerRecorderHandle>();
+            ProfilerRecorderHandle.GetAvailable(handles);
+            foreach (var handle in handles)
+            {
+                var description = ProfilerRecorderHandle.GetDescription(handle);
+                if (description.Name != "Physics2D.Simulate" || description.UnitType.ToString() != "TimeNanoseconds") continue;
+                try { physicsRecorder = ProfilerRecorder.StartNew(description.Category, description.Name, 16, ProfilerRecorderOptions.Default); }
+                catch (Exception exception) when (exception is ArgumentException || exception is InvalidOperationException)
+                { Debug.LogWarning("[PointPass Worker] Physics CPU recorder unavailable; no timing will be inferred from frame intervals."); }
+                break;
+            }
+        }
+        private void RecordFrameMetrics(double now)
+        {
+            if (previousFrameAt > 0)
+            {
+                double interval = Math.Max(0, now - previousFrameAt);
+                frameSecondsSum += interval; frameSecondsPeak = Math.Max(frameSecondsPeak, interval); frameSamples++;
+            }
+            previousFrameAt = now;
+            if (!physicsRecorder.Valid) return;
+            for (int i = 0; i < physicsRecorder.Count; i++)
+            {
+                var sample = physicsRecorder.GetSample(i);
+                if (sample.Count <= 0 || sample.Value < 0) continue;
+                physicsFrameSamples++; physicsCalls += sample.Count;
+                physicsNanosecondsSum += sample.Value; physicsNanosecondsPeak = Math.Max(physicsNanosecondsPeak, sample.Value);
+            }
+            physicsRecorder.Reset();
+        }
+        private void WriteMetrics(double now)
+        {
+            double interval = Math.Max(.001, now - summaryAt);
+            string physics = !physicsRecorder.Valid ? "physics2dCpuStatus=unavailable"
+                : physicsFrameSamples == 0 ? "physics2dCpuStatus=no_samples"
+                : FormattableString.Invariant($"physics2dCpuStatus=measured physics2dSampleFrames={physicsFrameSamples} physics2dMarkerCalls={physicsCalls} physics2dSampleFrameCpuMeanMs={physicsNanosecondsSum / (double)physicsFrameSamples / 1000000:F4} physics2dSampleFrameCpuPeakMs={physicsNanosecondsPeak / 1000000d:F4}");
+            Debug.Log(FormattableString.Invariant($"[PointPass Worker] metrics peers={peers.Count} simulatedSeconds={simulationSeconds:F2} activeFixedSteps={activeFixedSteps} activeStepsPerWallSecond={(activeFixedSteps - previousStepCount) / interval:F2} sampleWallSeconds={interval:F2} workerWallFrameSamples={frameSamples} workerWallFrameMeanMs={(frameSamples > 0 ? frameSecondsSum / frameSamples * 1000 : 0):F3} workerWallFramePeakMs={frameSecondsPeak * 1000:F3} commands={commands} rejected={rejected} admissionRejected={admissionRejected} malformedRejected={malformedRejected} orderingRejected={orderingRejected} actionRejected={actionRejected} rateRejected={rateRejected} probeRejected={probeRejected} unknownPeerRejected={unknownPeerRejected} waitingHeartbeatsIgnored={waitingHeartbeatsIgnored} closingHeartbeatsIgnored={closingHeartbeatsIgnored} snapshots={snapshots} payloadBytesSent={bytesSent} payloadBytesReceived={bytesReceived} slot0InputRx={inputBytesReceivedBySlot[0]} slot1InputRx={inputBytesReceivedBySlot[1]} slot0ProbeRx={probeBytesReceivedBySlot[0]} slot1ProbeRx={probeBytesReceivedBySlot[1]} slot0StateTx={stateBytesSentBySlot[0]} slot1StateTx={stateBytesSentBySlot[1]} slot0ProbeTx={probeBytesSentBySlot[0]} slot1ProbeTx={probeBytesSentBySlot[1]} ") + physics);
+            // Timing samples cover a summary window; payload/rejection totals are
+            // worker-lifetime counters. Payload totals exclude NGO/UDP/DTLS overhead,
+            // retransmits and HTTP/admission traffic. Frame intervals are not CPU time.
+            summaryAt = now; previousStepCount = activeFixedSteps;
+            frameSecondsSum = frameSecondsPeak = 0; frameSamples = 0;
+            physicsFrameSamples = physicsCalls = physicsNanosecondsSum = physicsNanosecondsPeak = 0;
+        }
 
         private void QueueDeparture(string departedMatch, string player, ulong connection)
         {
@@ -265,29 +358,48 @@ namespace PointPass.Server
 
         private void Input(ulong client, FastBufferReader reader)
         {
-            if (world == null || submitting || !peers.TryGetValue(client, out Peer peer)) { rejected++; return; }
+            if (!peers.TryGetValue(client, out Peer peer)) { Reject(Rejection.UnknownPeer); return; }
+            int received = Math.Max(0, reader.Length - reader.Position);
+            bytesReceived += received; inputBytesReceivedBySlot[peer.Slot] += received;
+            if (world == null || submitting)
+            {
+                // Do not turn ordinary heartbeats during admission/result cleanup
+                // into apparent attacks. Malformed data remains malformed in every phase.
+                if (!OnlineProtocol.TryInput(OnlineProtocol.Read(reader, OnlineProtocol.InputBytes), out NetworkInputCommand idle, out _))
+                    Reject(Rejection.Malformed);
+                else if (idle.Action != NetworkKickAction.None) Reject(Rejection.Action);
+                else if (submitting) closingHeartbeatsIgnored++;
+                else waitingHeartbeatsIgnored++;
+                return;
+            }
             double now = Time.unscaledTimeAsDouble;
             if (now - peer.Window >= 1) { peer.Window = now; peer.Count = 0; }
-            if (++peer.Count > 120 || !OnlineProtocol.TryInput(OnlineProtocol.Read(reader, OnlineProtocol.InputBytes), out NetworkInputCommand command, out uint acknowledged)
-                || (peer.HasSequence && unchecked((int)(command.Sequence - peer.Sequence)) <= 0)
+            if (++peer.Count > 120) { Reject(Rejection.Rate); return; }
+            if (!OnlineProtocol.TryInput(OnlineProtocol.Read(reader, OnlineProtocol.InputBytes), out NetworkInputCommand command, out uint acknowledged))
+            { Reject(Rejection.Malformed); return; }
+            if ((peer.HasSequence && unchecked((int)(command.Sequence - peer.Sequence)) <= 0)
                 || acknowledged == 0 || unchecked((int)(sequence - acknowledged)) < 0 || unchecked((int)(sequence - acknowledged)) > 90)
-            { rejected++; return; }
+            { Reject(Rejection.Ordering); return; }
             peer.Sequence = command.Sequence; peer.HasSequence = true; peer.LastInput = now; commands++;
             if (Time.timeScale == 0 || !world.Simulation.IsPlaying) return;
             var player = world.Players[peer.Slot];
             bool begin = command.Action == NetworkKickAction.BeginPass || command.Action == NetworkKickAction.BeginShot;
             if (begin && (!player.Dribbler.HasBall || player.ChargingKick != PointPass.Players.PlayerKicker.KickType.None))
-            { rejected++; command.Action = NetworkKickAction.None; }
+            { Reject(Rejection.Action); command.Action = NetworkKickAction.None; }
             command.Apply(player);
         }
 
         private void Probe(ulong client, FastBufferReader reader)
         {
-            if (!peers.TryGetValue(client, out Peer peer)) return;
+            if (!peers.TryGetValue(client, out Peer peer)) { Reject(Rejection.UnknownPeer); return; }
+            int received = Math.Max(0, reader.Length - reader.Position);
+            bytesReceived += received; probeBytesReceivedBySlot[peer.Slot] += received;
             double now = Time.unscaledTimeAsDouble;
             if (now - peer.Window >= 1) { peer.Window = now; peer.Count = 0; }
-            if (++peer.Count > 125 || reader.Length - reader.Position != 8) { rejected++; return; }
+            if (++peer.Count > 125) { Reject(Rejection.Rate); return; }
+            if (reader.Length - reader.Position != 8) { Reject(Rejection.Probe); return; }
             OnlineProtocol.Send(network, OnlineProtocol.ProbeMessage, client, OnlineProtocol.Read(reader, 8), NetworkDelivery.Unreliable);
+            RecordPayloadSent(peer.Slot, 8, true);
         }
 
         private IEnumerator Heartbeat()
@@ -387,6 +499,7 @@ namespace PointPass.Server
             if (network != null) network.Shutdown();
             world?.Dispose();
         }
+        private void OnDestroy() { if (physicsRecorder.Valid) physicsRecorder.Dispose(); }
 #endif
     }
 }

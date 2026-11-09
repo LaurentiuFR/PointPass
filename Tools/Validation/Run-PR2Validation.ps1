@@ -13,26 +13,42 @@ New-Item -ItemType Directory -Force -Path "$validationRoot/Assets/Resources/Art"
 Get-ChildItem "$repositoryRoot/Assets/_Project/Resources/Art" -File |
     Where-Object { $_.Extension -in @('.shader', '.cginc') } | Copy-Item -Destination "$validationRoot/Assets/Resources/Art"
 
+# A reused isolated project can contain scripts copied from a different branch.
+# Synchronize only these two generated, flat directories before copying this branch.
+$generatedDirectories = @(
+    (Resolve-Path -LiteralPath "$validationRoot/Assets/Scripts").Path,
+    (Resolve-Path -LiteralPath "$validationRoot/Assets/Editor").Path
+)
+function Remove-StaleValidationScripts([string]$Directory, [string[]]$ExpectedNames) {
+    $resolvedDirectory = (Resolve-Path -LiteralPath $Directory).Path
+    if ($resolvedDirectory -notin $generatedDirectories) { throw 'Refusing to clean outside the isolated validation directories.' }
+    $prefix = $resolvedDirectory.TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+    foreach ($script in Get-ChildItem -LiteralPath $resolvedDirectory -File -Filter '*.cs') {
+        if ($script.Name -in $ExpectedNames) { continue }
+        foreach ($candidate in @($script.FullName, ($script.FullName + '.meta'))) {
+            if (!(Test-Path -LiteralPath $candidate -PathType Leaf)) { continue }
+            $resolvedFile = (Resolve-Path -LiteralPath $candidate).Path
+            if (!$resolvedFile.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase) -or
+                [IO.Path]::GetDirectoryName($resolvedFile) -ne $resolvedDirectory) {
+                throw 'Refusing to remove a validation file outside its checked directory.'
+            }
+            Remove-Item -LiteralPath $resolvedFile
+        }
+    }
+}
+$sourceFiles = @(Get-ChildItem "$repositoryRoot/Assets/_Project/Scripts" -Recurse -Filter '*.cs' -File)
+$helpers = @('PR2Validation', 'InputFeelValidation', 'TurningValidation', 'PresentationValidation',
+    'MenuValidation', 'FlowAnimationValidation', 'CurveValidation', 'FlickValidation', 'StadiumValidation',
+    'GoalPresentationValidation', 'MatchDayValidation', 'GoalMomentValidation', 'MenuSharpnessValidation',
+    'LightingValidation', 'ReplayValidation', 'LobbyValidation', 'PracticeValidation',
+    'ReplayControlsValidation', 'MobileCancellationValidation', 'AudioFeedbackValidation')
+Remove-StaleValidationScripts $generatedDirectories[0] $sourceFiles.Name
+Remove-StaleValidationScripts $generatedDirectories[1] @($helpers | ForEach-Object { $_ + '.cs' })
+
 # Copy source only. Unity generates metadata inside the disposable project.
 # The editor-only harness does not enter Play Mode; include actor factories used by replay.
-Get-ChildItem "$repositoryRoot/Assets/_Project/Scripts" -Recurse -Filter '*.cs' |
-    Copy-Item -Destination "$validationRoot/Assets/Scripts"
-Copy-Item "$PSScriptRoot/PR2Validation.cs" "$validationRoot/Assets/Editor/PR2Validation.cs"
-Copy-Item "$PSScriptRoot/InputFeelValidation.cs" "$validationRoot/Assets/Editor/InputFeelValidation.cs"
-Copy-Item "$PSScriptRoot/TurningValidation.cs" "$validationRoot/Assets/Editor/TurningValidation.cs"
-Copy-Item "$PSScriptRoot/PresentationValidation.cs" "$validationRoot/Assets/Editor/PresentationValidation.cs"
-Copy-Item "$PSScriptRoot/MenuValidation.cs" "$validationRoot/Assets/Editor/MenuValidation.cs"
-Copy-Item "$PSScriptRoot/FlowAnimationValidation.cs" "$validationRoot/Assets/Editor/FlowAnimationValidation.cs"
-Copy-Item "$PSScriptRoot/CurveValidation.cs" "$validationRoot/Assets/Editor/CurveValidation.cs"
-Copy-Item "$PSScriptRoot/FlickValidation.cs" "$validationRoot/Assets/Editor/FlickValidation.cs"
-Copy-Item "$PSScriptRoot/StadiumValidation.cs" "$validationRoot/Assets/Editor/StadiumValidation.cs"
-Copy-Item "$PSScriptRoot/GoalPresentationValidation.cs" "$validationRoot/Assets/Editor/GoalPresentationValidation.cs"
-Copy-Item "$PSScriptRoot/MatchDayValidation.cs" "$validationRoot/Assets/Editor/MatchDayValidation.cs"
-Copy-Item "$PSScriptRoot/GoalMomentValidation.cs" "$validationRoot/Assets/Editor/GoalMomentValidation.cs"
-Copy-Item "$PSScriptRoot/MenuSharpnessValidation.cs" "$validationRoot/Assets/Editor/MenuSharpnessValidation.cs"
-Copy-Item "$PSScriptRoot/LightingValidation.cs" "$validationRoot/Assets/Editor/LightingValidation.cs"
-Copy-Item "$PSScriptRoot/ReplayValidation.cs" "$validationRoot/Assets/Editor/ReplayValidation.cs"
-foreach ($helper in @('LobbyValidation', 'PracticeValidation', 'ReplayControlsValidation', 'MobileCancellationValidation', 'AudioFeedbackValidation')) {
+$sourceFiles | Copy-Item -Destination "$validationRoot/Assets/Scripts"
+foreach ($helper in $helpers) {
     Copy-Item "$PSScriptRoot/$helper.cs" "$validationRoot/Assets/Editor/$helper.cs"
 }
 Copy-Item "$repositoryRoot/ProjectSettings/ProjectVersion.txt" "$validationRoot/ProjectSettings/ProjectVersion.txt"

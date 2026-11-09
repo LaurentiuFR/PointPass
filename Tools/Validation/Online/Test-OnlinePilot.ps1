@@ -5,6 +5,7 @@ param(
     [string]$ReportDirectory = "$PSScriptRoot/../../../Logs/OnlinePilotVerification/Clients",
     [string]$BlueProfile = 'pilot-blue',
     [string]$RedProfile = 'pilot-red',
+    [scriptblock]$InvitationProvider,
     [switch]$FullMatch,
     [switch]$KeepClients
 )
@@ -20,6 +21,9 @@ foreach ($role in $roles) {
     if ($role -notmatch '^[A-Za-z0-9-]{1,24}$') { throw 'Profiles must contain1–24ASCIIletters/digits/hyphens.' }
 }
 if ($BlueProfile -eq $RedProfile) { throw 'Use different guest profiles for the two clients.' }
+if ($InvitationProvider -and ($PSBoundParameters.ContainsKey('BlueInvitationFile') -or $PSBoundParameters.ContainsKey('RedInvitationFile'))) {
+    throw 'Select either the private in-memory invitation provider or legacy invitation files.'
+}
 $invitations = @{
     $BlueProfile = [IO.Path]::GetFullPath($BlueInvitationFile)
     $RedProfile = [IO.Path]::GetFullPath($RedInvitationFile)
@@ -82,11 +86,38 @@ function Wait-For([scriptblock]$Condition, [string]$Description, [int]$Seconds =
 
 function Start-Player([string]$Role) {
     $arguments = @('-pointpassOnlineTest', '-pointpassProfile', $Role,
-        '-pointpassInvitationFile', ('"' + $invitations[$Role] + '"'),
-        '-pointpassTestDirectory', ('"' + $reportRoot + '"'),
+        '-pointpassTestDirectory', $reportRoot,
         '-screen-width', '1280', '-screen-height', '720', '-screen-fullscreen', '0', '-force-d3d11',
-        '-logFile', ('"' + (Join-Path $reportRoot "$Role-player.log") + '"'))
-    $processes[$Role] = Start-Process -FilePath $playerPath -ArgumentList $arguments -WindowStyle Hidden -PassThru
+        '-logFile', (Join-Path $reportRoot "$Role-player.log"))
+    $invitation = $null
+    try {
+        if ($InvitationProvider) {
+            # The provider must capture pinned SSH stdout in memory, verify its exit
+            # status and return one code (or an empty line for a registered profile).
+            # Neither provider output nor its exception details are logged here.
+            try { $invitation = & $InvitationProvider $Role }
+            catch { throw 'Private invitation provider failed; its response was not logged.' }
+            if ($null -eq $invitation) { $invitation = '' }
+            if ($invitation -isnot [string] -or ($invitation.Length -ne 0 -and $invitation -notmatch '^[A-Za-z0-9_-]{43}$')) {
+                throw 'Private invitation provider returned an invalid response; its content was not logged.'
+            }
+            $arguments += '-pointpassInvitationStdin'
+        }
+        else { $arguments += @('-pointpassInvitationFile', $invitations[$Role]) }
+        $start = [Diagnostics.ProcessStartInfo]::new()
+        $start.FileName = $playerPath; $start.UseShellExecute = $false
+        $start.WindowStyle = [Diagnostics.ProcessWindowStyle]::Hidden; $start.CreateNoWindow = $true
+        $start.RedirectStandardInput = [bool]$InvitationProvider
+        foreach ($argument in $arguments) { $start.ArgumentList.Add($argument) }
+        $process = [Diagnostics.Process]::new(); $process.StartInfo = $start
+        if (!$process.Start()) { throw 'Could not start the test client.' }
+        $processes[$Role] = $process
+        if ($InvitationProvider) {
+            try { $process.StandardInput.WriteLine($invitation); $process.StandardInput.Flush() }
+            finally { $process.StandardInput.Close() }
+        }
+    }
+    finally { $invitation = $null }
 }
 
 function Stop-Movement {

@@ -20,6 +20,24 @@ void Invalid(Action operation, string label)
     throw new InvalidOperationException("FAILED: " + label);
 }
 
+void InvalidInvitationOutput(string[] arguments, bool redirected, string label)
+{
+    try { InvitationCommand.Destination(arguments, redirected); }
+    catch (InvalidOperationException) { Check(true, label); return; }
+    throw new InvalidOperationException("FAILED: " + label);
+}
+string invitationExamplePath = Path.Combine(Path.GetTempPath(), "pointpass-invitation-example.txt");
+Check(InvitationCommand.Destination(new[] { "--create-invite", "--invite-stdout" }, true) == null,
+    "explicit redirected invitation pipe has no file destination");
+Check(InvitationCommand.Destination(new[] { "--create-invite", "--invite-file", invitationExamplePath }, false) == invitationExamplePath,
+    "legacy private file destination remains supported");
+InvalidInvitationOutput(new[] { "--create-invite", "--invite-stdout" }, false, "terminal invitation output is refused before minting");
+InvalidInvitationOutput(new[] { "--create-invite", "--invite-stdout", "--invite-file", invitationExamplePath }, true,
+    "mixed invitation output modes are refused");
+InvalidInvitationOutput(new[] { "--create-invite", "--invite-stdout", "--invite-stdout" }, true, "duplicate invitation pipe mode is refused");
+InvalidInvitationOutput(new[] { "--create-invite", "--invite-file", "relative-private-file" }, true, "relative invitation file is refused");
+InvalidInvitationOutput(new[] { "--create-invite" }, true, "invitation output mode must be explicit");
+
 var tokens = new HashSet<string>(StringComparer.Ordinal);
 for (int i = 0; i < 1000; i++)
 {

@@ -3,6 +3,7 @@ using System;
 using System.Globalization;
 using System.IO;
 using System.Reflection;
+using System.Threading.Tasks;
 using PointPass.Networking;
 using PointPass.Players;
 using UnityEngine;
@@ -51,6 +52,7 @@ namespace PointPass.Online
         private Vector2 move, aim;
         private float curve;
         private bool sprint, priorBackground;
+        private bool invitationStdin, invitationRead;
         private InputSettings.BackgroundBehavior priorInputBehavior;
         private StreamWriter snapshots;
         private readonly CultureInfo invariant = CultureInfo.InvariantCulture;
@@ -70,6 +72,8 @@ namespace PointPass.Online
             foreach (char letter in role) if (!char.IsLetterOrDigit(letter) && letter != '-') throw new ArgumentException("Invalid online test profile.");
             directory = Path.GetFullPath(Argument(args, "-pointpassTestDirectory", "Logs/OnlinePilotVerification/Clients"));
             invitationPath = Argument(args, "-pointpassInvitationFile", "");
+            invitationStdin = Array.IndexOf(args, "-pointpassInvitationStdin") >= 0;
+            if (invitationStdin && !string.IsNullOrEmpty(invitationPath)) throw new ArgumentException("Select one test invitation input mode.");
             Directory.CreateDirectory(directory);
             priorBackground = Application.runInBackground;
             priorInputBehavior = InputSystem.settings.backgroundBehavior;
@@ -93,14 +97,56 @@ namespace PointPass.Online
             string invitation = "";
             try
             {
-                if (!string.IsNullOrEmpty(invitationPath) && File.Exists(invitationPath))
+                if (!invitationRead && invitationStdin)
                 {
+                    invitationRead = true;
+                    if (!Console.IsInputRedirected) { error = "invitation_stdin_not_redirected"; return; }
+                    // The harness preloads a single line and closes its private pipe.
+                    // Bound both the data length and startup wait; never echo input.
+                    Task<string> read = Task.Run(() => ReadPrivateInvitation(Console.In));
+                    if (!read.Wait(TimeSpan.FromSeconds(10))) { error = "invitation_stdin_timeout"; return; }
+                    invitation = read.Result;
+                }
+                else if (!invitationRead && !string.IsNullOrEmpty(invitationPath) && File.Exists(invitationPath))
+                {
+                    invitationRead = true;
                     if (new FileInfo(invitationPath).Length > 256) { error = "invitation_file_too_large"; return; }
                     invitation = File.ReadAllText(invitationPath).Trim();
                 }
+                // Rejoins use the persisted guest identity, not the one-use invitation.
+                client.Join(invitation, role);
             }
-            catch (IOException) { error = "invitation_file_unavailable"; return; }
-            client.Join(invitation, role);
+            catch (IOException) { error = invitationStdin ? "invitation_stdin_unavailable" : "invitation_file_unavailable"; return; }
+            catch (AggregateException) { error = "invitation_stdin_unavailable"; return; }
+            catch (InvalidOperationException) { error = "invitation_stdin_unavailable"; return; }
+            catch (NotSupportedException) { error = "invitation_stdin_unavailable"; return; }
+            finally { invitation = null; }
+        }
+
+        private static string ReadPrivateInvitation(TextReader input)
+        {
+            var buffer = new char[43]; int count = 0;
+            try
+            {
+                while (true)
+                {
+                    int value = input.Read();
+                    if (value < 0 || value == '\n') break;
+                    if (value == '\r')
+                    {
+                        int next = input.Read();
+                        if (next != '\n' && next >= 0) throw new InvalidDataException("Invalid private invitation line.");
+                        break;
+                    }
+                    if (count >= buffer.Length || !((value >= 'A' && value <= 'Z') || (value >= 'a' && value <= 'z')
+                        || (value >= '0' && value <= '9') || value == '-' || value == '_'))
+                        throw new InvalidDataException("Invalid private invitation line.");
+                    buffer[count++] = (char)value;
+                }
+                if (count != 0 && count != buffer.Length) throw new InvalidDataException("Invalid private invitation line.");
+                return count == 0 ? "" : new string(buffer);
+            }
+            finally { Array.Clear(buffer, 0, buffer.Length); }
         }
 
         private void Record(NetworkMatchState state)

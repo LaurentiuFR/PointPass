@@ -39,7 +39,7 @@ Prior implementation/deployment claims below are historical until rechecked. Cur
 | 8. Active resources/capacity | Idle baseline saved. Active two-client CPU, bandwidth, disk and timing proof is pending. The pilot has one configured room. |
 | 9. Backups/retention | **PASS, live drill**: fresh private dump restored 2 profiles/2 verified results into a disposable DB, then that DB was removed. Six successful dumps, each <=1GiB, mode0600 under root0700; no partial files. Seven-dump policy and active daily/logrotate/journal retention verified. Same-SSD/off-host limit documented. |
 | 10. Costs | **PASS, documented** in `Deploy/COSTS.md`: owner-reported 10.19/month plus usage charges, published EU traffic/IPv4/optional-storage terms and explicit unknown currency/VAT/account tariff. No paid add-ons enabled. |
-| 11. Regressions | Local suites being rerun; record exact fresh outcomes before marking complete. |
+| 11. Regressions | Local automated offline, protocol, headless, command-boundary, rendered gameplay and API suites passed. Fresh dedicated Linux and Windows builds both succeeded. Full live multiplayer rerun pending. |
 | 12. Invitations/Git | Server currently has 2 consumed, 1 unused invitation; do not revoke an owner invitation. Reachable Git scan found no matching secret/generated files; ignore hardening under review. |
 | 13. Compatibility | **PASS, contract review and automated checks**. Keep `PointPass-Online-1` and wire version 1. Audit tooling preserves the online payloads and action set. All 248 codec checks passed, and the isolated API rejected a mismatched identifier. |
 
