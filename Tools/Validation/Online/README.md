@@ -63,13 +63,13 @@ Windows stores a random guest credential protected for the current OS user with 
 
 The opt-in test driver is compiled only for Editor/development clients. It reads file commands and submits ordinary local controller inputs. It cannot place actors, grant possession, change scores or clocks, access a worker credential or submit a trusted result.
 
-Use distinct guest profiles when running two clients on one Windows account. A first sign-in needs private invitations. If invitations are kept only on the server, complete the first sign-ins privately in the actual game UI, then reuse the protected test profiles; do not invent an invitation bypass for automation.
+Use distinct guest profiles when running two clients on one Windows account. For first sign-in, the pinned SSH runner acquires the shared server test lock, checks the room is idle, and passes single-use invitations directly from SSH output to the clients' input streams. It reports only how many invitations were consumed. Point it at the existing local key and a known-hosts file with the expected Ed25519 entry.
 
 ```powershell
-./Tools/Validation/Online/Test-OnlinePilot.ps1 -FullMatch
+./Tools/Validation/Online/Test-OnlinePilotSsh.ps1 -SshKeyPath $key -KnownHostsFile $knownHosts -FullMatch
 ```
 
-Optional parameters include `-Player`, `-BlueProfile`, `-RedProfile`, `-BlueInvitationFile`, `-RedInvitationFile` and `-ReportDirectory`. Private invitation-file transfer requires the owner's approval; it is not required for already registered profiles. The harness creates only its own command/state/capture files under the report directory and owns only the processes it launches.
+Optional parameters include `-Player`, `-BlueProfile`, `-RedProfile` and `-ReportDirectory`. Add `-ReuseProfiles` with the existing profile names to reuse their Windows-protected guest credentials. The harness creates its own command, state and capture files under the report directory and stops only the processes it launches.
 
 It checks two real Windows processes, client physics disabled, independent movement, shared possession, charged passes in both directions, sprint/cancel, both curved shots/goals, common scores/restarts, reconnecting and exact matching server snapshots. `-FullMatch` additionally waits for the normal-duration match and server completion; a shorter smoke run explicitly leaves that verification pending. Allow the 30-second abandonment window before repeating a smoke run that exits mid-match.
 

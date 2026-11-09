@@ -64,6 +64,8 @@ The live two-client rerun remains pending, including authenticated invalid-comma
 
 Over 65.42 seconds with zero peers, the worker stayed at 535.1 simulated seconds and 18,148 snapshots. Match-worker CPU was 1.704% of one logical core (0.426% of the four-core host). API and PostgreSQL used 0.869% and 0.060% of one core. Mean cgroup memory sampled at 1 Hz was 84.44 MiB for the worker, 58.41 MiB for the API and 46.75 MiB for PostgreSQL. PostgreSQL's `pointpass` database stayed at 8,386,239 bytes. The only observed change among the sampled service paths was 190 bytes of nginx logs. This is a short idle sample of the release deployed before the audit. `Logs/OnlinePilotVerification/CurrentAudit/idle-baseline-20261109.txt`
 
+**Invitations and Git hygiene (item 12).** Two single-use audit invitations were created over pinned SSH and passed through redirected input to the two Windows clients. PostgreSQL found both exact invitation records and verified one use for each. The runner emitted counts only. The Git scan checked 435 committed paths, 437 unique historical paths and all 656 blobs reachable from `8977945`, plus the working runner and ignore rules. It found no credential patterns or prohibited paths. The scope was the pilot branch and reviewed changes. Other operators' invitation records and local protected credentials were outside that scan.
+
 ## Historical checkpoint
 
 This is an intermediate, measured record from **4 November 2026, 11:36 UTC**. A configured room capacity does not establish tested gameplay capacity. Windows gameplay and active-match measurements must be recorded separately before the pilot is called complete.

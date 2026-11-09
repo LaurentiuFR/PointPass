@@ -25,7 +25,7 @@ Read the diff before committing. Integrating a newer menu/gameplay branch is a s
 
 ## Current continuation status — 9 November 2026
 
-Prior implementation/deployment claims below are historical until rechecked. Current access uses the friend's SSH key in place with the exact pinned host fingerprint; no SSH/root policy changes are authorised. Invitations for new automated tests must remain in memory/anonymous pipes, never terminal output, arguments, files or Git. The legacy file-only helper is being adapted before any new invitation is created.
+Prior implementation and deployment claims below are historical until rechecked. Current access uses the friend's SSH key in place with the exact pinned host fingerprint. The test runner streams invitations through memory and anonymous pipes and records only the consumption count.
 
 | Item | Current evidence/status |
 | --- | --- |
@@ -40,7 +40,7 @@ Prior implementation/deployment claims below are historical until rechecked. Cur
 | 9. Backups/retention | **PASS, live drill**: fresh private dump restored 2 profiles/2 verified results into a disposable DB, then that DB was removed. Six successful dumps, each <=1GiB, mode0600 under root0700; no partial files. Seven-dump policy and active daily/logrotate/journal retention verified. Same-SSD/off-host limit documented. |
 | 10. Costs | **PASS, documented** in `Deploy/COSTS.md`: owner-reported 10.19/month plus usage charges, published EU traffic/IPv4/optional-storage terms and explicit unknown currency/VAT/account tariff. No paid add-ons enabled. |
 | 11. Regressions | Local automated offline, protocol, headless, command-boundary, rendered gameplay and API suites passed. Fresh dedicated Linux and Windows builds both succeeded. Full live multiplayer rerun pending. |
-| 12. Invitations/Git | Server currently has 2 consumed, 1 unused invitation; do not revoke an owner invitation. Reachable Git scan found no matching secret/generated files; ignore hardening under review. |
+| 12. Invitations/Git | **PASS**. Both audit invitations were consumed exactly once, verified by exact hash match with count-only output. The reachable branch and new runner passed the secret/generated-path scan. Retries reuse the protected profiles. |
 | 13. Compatibility | **PASS, contract review and automated checks**. Keep `PointPass-Online-1` and wire version 1. Audit tooling preserves the online payloads and action set. All 248 codec checks passed, and the isolated API rejected a mismatched identifier. |
 
 No service restart, production configuration change, or full gameplay test has occurred in this continuation at this checkpoint. Menu, HUD, tackling, stamina and dribbling are out of scope. Phone/touch/second-PC testing remains untested.
