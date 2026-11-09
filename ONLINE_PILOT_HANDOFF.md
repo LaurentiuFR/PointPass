@@ -23,7 +23,7 @@ git apply C:/path/to/pointpass-online-pilot.patch
 Read the diff before committing. Integrating a newer menu/gameplay branch is a subsequent review, not an assumption that the patch applies cleanly to it.
 
 
-## Current continuation status — 5 November 2026
+## Current continuation status — 9 November 2026
 
 Prior implementation/deployment claims below are historical until rechecked. Current access uses the friend's SSH key in place with the exact pinned host fingerprint; no SSH/root policy changes are authorised. Invitations for new automated tests must remain in memory/anonymous pipes, never terminal output, arguments, files or Git. The legacy file-only helper is being adapted before any new invitation is created.
 
@@ -40,7 +40,7 @@ Prior implementation/deployment claims below are historical until rechecked. Cur
 | 10. Costs | **PASS, documented** in `Deploy/COSTS.md`: owner-reported 10.19/month plus usage charges, published EU traffic/IPv4/optional-storage terms and explicit unknown currency/VAT/account tariff. No paid add-ons enabled. |
 | 11. Regressions | Local suites being rerun; record exact fresh outcomes before marking complete. |
 | 12. Invitations/Git | Server currently has 2 consumed, 1 unused invitation; do not revoke an owner invitation. Reachable Git scan found no matching secret/generated files; ignore hardening under review. |
-| 13. Compatibility | Static audit: operational/test-only changes retain `PointPass-Online-1` / wire1. Recheck final changes before completion. |
+| 13. Compatibility | **PASS, contract review and automated checks**. Keep `PointPass-Online-1` and wire version 1. Audit tooling preserves the online payloads and action set. All 248 codec checks passed, and the isolated API rejected a mismatched identifier. |
 
 No service restart, production configuration change, or full gameplay test has occurred in this continuation at this checkpoint. Menu, HUD, tackling, stamina and dribbling are out of scope. Phone/touch/second-PC testing remains untested.
 

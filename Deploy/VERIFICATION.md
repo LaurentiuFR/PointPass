@@ -39,6 +39,25 @@ Evidence: `Logs/OnlinePilotVerification/CurrentAudit/backup-restore.txt`. Dumps 
 
 The owner reports 10.19/month plus usage costs. `Deploy/COSTS.md` records official traffic/storage/IPv4 terms without assuming the invoice currency, VAT, legacy tariff or whether IPv4 is already included. The exact billed total needs the account invoice/usage. No purchases, paid backups, snapshots, resizing or add-ons were enabled.
 
+## Interim security, regression and compatibility evidence
+
+The evidence here was collected on 5 November 2026 and reviewed on 9 November. The isolated security suite ran against PostgreSQL `pointpass_validation` and a loopback API on port 5001. It passed 52 checks, then 22 after the isolated API restarted. Twenty checks repeated, giving 54 distinct assertions. The report is `Logs/OnlinePilotVerification/CurrentAudit/backend-integration.txt`.
+
+- **Certificate validation passed on the live endpoint.** Windows HTTPS used the default trust store and rejected the wrong IP identity. Windows Unity/NGO reached invalid-ticket rejection with the trusted IP, rejected the wrong TLS name, then recovered with the correct identity. Certificate validation stayed enabled throughout. `Logs/OnlinePilotVerification/encrypted-admission-tests.txt`
+- **Unauthorized profile access was rejected.** The live API returned 401 without a bearer token. The isolated API bound profile identity to the authenticated guest and returned 400 for a profile query that tried to impersonate another guest. `Logs/OnlinePilotVerification/CurrentAudit/backend-integration.txt`
+- **Expired tickets were rejected in isolation.** The fixture expired one ticket in its disposable database before redemption, which returned 403. `Logs/OnlinePilotVerification/CurrentAudit/backend-integration.txt`
+- **Reused tickets were rejected in isolation.** A second redemption returned 403 after the first redemption committed. `Logs/OnlinePilotVerification/CurrentAudit/backend-integration.txt`
+- **Duplicate results were idempotent in isolation.** Repeating the trusted result yielded one history entry and one win. A conflicting repeat returned 409. `Logs/OnlinePilotVerification/CurrentAudit/backend-integration.txt`
+- **Invalid commands were rejected in local Unity fixtures.** The codec and command-boundary suites covered malformed payloads, ownership and stale or duplicate releases. Another 25 worker metric checks verified rejection reasons and separate accounting for normal waiting or closing heartbeats. A live malformed-only counter delta remains pending. `Logs/OnlinePilotVerification/protocol-tests.txt`, `Logs/OnlinePilotVerification/command-boundary-tests.txt`, `Logs/OnlinePilotVerification/worker-metrics-tests.txt`
+- **Full-room rejection passed in isolation.** A third guest received 409 after both slots were reserved. `Logs/OnlinePilotVerification/CurrentAudit/backend-integration.txt`
+- **Disconnect/rejoin passed in isolation.** The same guest reclaimed the original slot with a fresh ticket. A stale disconnect could neither eject the reconnected guest nor overwrite its connection identity. `Logs/OnlinePilotVerification/CurrentAudit/backend-integration.txt`
+
+The live two-client rerun remains pending, including authenticated invalid-command, full-room and disconnect/rejoin checks. The independently verified 2–1 database result above records the earlier match outcome.
+
+**Local regression evidence (item 11).** The automated Windows runs passed 409 offline engine assertions, 248 wire-codec checks, 28 headless gameplay checks, 16 command-boundary checks, 51 rendered offline gameplay checks, 13 pure backend checks and seven loopback HTTP security checks. The offline match exercised movement, passing, shooting, goals, keepers, audio and practice through synthetic inputs. The engine suite passed after the harness synchronized its disposable source mirror to this branch. The test environment used Unity 6000.3.27f2 and .NET 10. The saved Linux rebuild report records three errors. A successful fresh Linux build and live multiplayer rerun remain pending, along with manual play, phone, physical touch and second-PC tests. `Logs/OnlinePilotVerification/local-regressions-20261105.md`, `Logs/OnlinePilotVerification/server-build.json`
+
+**Compatibility review (item 13).** Retain `PointPass-Online-1` and wire version 1. The reviewed audit changes preserve the admission identifier, explicit input/state encoding and supported gameplay actions. The isolated API rejected an incompatible identifier and the codec suite passed 248 checks. The project still pins NGO 2.13.3 and Unity Transport 2.7.4. `Assets/_Project/Scripts/Online/OnlineProtocol.cs`, `Packages/manifest.json`, `Logs/OnlinePilotVerification/protocol-tests.txt`
+
 ## Historical checkpoint
 
 This is an intermediate, measured record from **4 November 2026, 11:36 UTC**. A configured room capacity does not establish tested gameplay capacity. Windows gameplay and active-match measurements must be recorded separately before the pilot is called complete.
