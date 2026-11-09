@@ -95,15 +95,9 @@ sudo ufw status verbose
 
 A restricted administration account can use only its explicitly approved fixed service-control helper. It must not be given arbitrary shell, file, systemctl-unit, or environment arguments through that helper. General rollout/OS administration still requires an approved recovery administrator.
 
-`deploy-release.sh` stops matches for maintenance, backs up existing data, applies new migrations, atomically switches the release symlink, verifies API health and starts the worker. A failed rollout restores previous binaries when available; it never silently reverses database migrations. Keep compatible rollback binaries until the release is verified. It refuses new deployments with less than 4 GiB free, more than 8 GiB of existing releases, or more than 2 GiB of staged binaries. Review and remove old inactive release directories only after inspecting the resolved paths and confirming `/opt/pointpass/current` does not reference them. No automated worker spawning or prewarming exists.
+`deploy-release.sh` takes the shared pilot verification lock. It requires an idle worker, no waiting or active match, and an empty result outbox. The database worker row stays locked through the final idle check and service stop, which blocks new admissions during that window. The script backs up existing data, applies migrations, atomically switches the release symlink, verifies API health and starts the worker. A failed rollout can restore previous binaries; database migrations remain applied. Keep compatible rollback binaries until the release is verified. Deployment requires at least 4 GiB free, no more than 8 GiB of existing releases, and staged binaries of at most 2 GiB. Review the resolved path of each inactive release and the current symlink before removing any old release.
 
-To create a single-use, 24-hour invitation file without printing its code:
-
-```sh
-sudo /opt/pointpass/bin/create-invite.sh tester-one
-```
-
-The helper reads the protected server environment and invokes the backend's `--create-invite --invite-file ABSOLUTE_PATH` administration command under `pointpassapi`. It prints only the private file path. Read/deliver the code privately to the participant using an approved secure channel; never paste it into shared logs or commit it. Guest credentials are client-local and must not be copied into the deployed build. Remove expired invitation **files** when no longer needed; doing so does not delete profiles or match history.
+For automated first sign-in, use [the pinned SSH test runner](../Tools/Validation/Online/README.md#two-actual-windows-clients). It invokes `create-invite.sh --pipe` under SSH, forwards each one-use invitation through a redirected stream to its client, and verifies consumption by count. Keep the key in place. Invitation codes and plaintext guest credentials stay out of command-line arguments, files, logs, builds and Git. Windows protects stored guest credentials with DPAPI.
 
 ## Backups and restore
 

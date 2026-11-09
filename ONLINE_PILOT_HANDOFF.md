@@ -43,7 +43,7 @@ Prior implementation and deployment claims below are historical until rechecked.
 | 12. Invitations/Git | **PASS**. Both audit invitations were consumed exactly once, verified by exact hash match with count-only output. The reachable branch and new runner passed the secret/generated-path scan. Retries reuse the protected profiles. |
 | 13. Compatibility | **PASS, contract review and automated checks**. Keep `PointPass-Online-1` and wire version 1. Audit tooling preserves the online payloads and action set. All 248 codec checks passed, and the isolated API rejected a mismatched identifier. |
 
-No service restart, production configuration change, or full gameplay test has occurred in this continuation at this checkpoint. Menu, HUD, tackling, stamina and dribbling are out of scope. Phone/touch/second-PC testing remains untested.
+The audited Linux worker and API are live as release `20261109T201829172528171Z`. The guarded rollout took a backup, then restarted the API and worker with the room idle. The profile and completed-result ID inventories matched across the restart. Menu, HUD, tackling, stamina and dribbling are out of scope. Phone, touch and second-PC checks remain pending.
 
 ## Implemented architecture
 

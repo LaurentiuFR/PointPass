@@ -66,6 +66,8 @@ Over 65.42 seconds with zero peers, the worker stayed at 535.1 simulated seconds
 
 **Invitations and Git hygiene (item 12).** Two single-use audit invitations were created over pinned SSH and passed through redirected input to the two Windows clients. PostgreSQL found both exact invitation records and verified one use for each. The runner emitted counts only. The Git scan checked 435 committed paths, 437 unique historical paths and all 656 blobs reachable from `8977945`, plus the working runner and ignore rules. It found no credential patterns or prohibited paths. The scope was the pilot branch and reviewed changes. Other operators' invitation records and local protected credentials were outside that scan.
 
+**Guarded live deployment.** Release `20261109T201829172528171Z` uses the API and worker sources from `8977945`. Eight mocked cases exercised the new idle gate before the live rollout. On the host the gate acquired the verification and PostgreSQL worker-row locks, observed no active or waiting match, a fresh zero-peer report, and an empty result outbox, then stopped the services. The deployment verified a fresh backup and restarted both services. Existing profile and completed-result IDs matched before and after restart. PostgreSQL and nginx stayed active. The new worker reported ready with encrypted UDP 7777, 50 Hz physics, 30 Hz snapshots and zero active fixed steps. `Logs/OnlinePilotVerification/CurrentAudit/deployment-20261109.txt`
+
 ## Historical checkpoint
 
 This is an intermediate, measured record from **4 November 2026, 11:36 UTC**. A configured room capacity does not establish tested gameplay capacity. Windows gameplay and active-match measurements must be recorded separately before the pilot is called complete.
