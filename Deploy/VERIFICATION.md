@@ -60,6 +60,10 @@ The live two-client rerun remains pending, including authenticated invalid-comma
 
 **Compatibility review (item 13).** Retain `PointPass-Online-1` and wire version 1. The reviewed audit changes preserve the admission identifier, explicit input/state encoding and supported gameplay actions. The isolated API rejected an incompatible identifier and the codec suite passed 248 checks. The project still pins NGO 2.13.3 and Unity Transport 2.7.4. `Assets/_Project/Scripts/Online/OnlineProtocol.cs`, `Packages/manifest.json`, `Logs/OnlinePilotVerification/protocol-tests.txt`
 
+## Live idle baseline, 9 November 2026
+
+Over 65.42 seconds with zero peers, the worker stayed at 535.1 simulated seconds and 18,148 snapshots. Match-worker CPU was 1.704% of one logical core (0.426% of the four-core host). API and PostgreSQL used 0.869% and 0.060% of one core. Mean cgroup memory sampled at 1 Hz was 84.44 MiB for the worker, 58.41 MiB for the API and 46.75 MiB for PostgreSQL. PostgreSQL's `pointpass` database stayed at 8,386,239 bytes. The only observed change among the sampled service paths was 190 bytes of nginx logs. This is a short idle sample of the release deployed before the audit. `Logs/OnlinePilotVerification/CurrentAudit/idle-baseline-20261109.txt`
+
 ## Historical checkpoint
 
 This is an intermediate, measured record from **4 November 2026, 11:36 UTC**. A configured room capacity does not establish tested gameplay capacity. Windows gameplay and active-match measurements must be recorded separately before the pilot is called complete.
