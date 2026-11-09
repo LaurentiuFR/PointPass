@@ -70,6 +70,24 @@ Over 65.42 seconds with zero peers, the worker stayed at 535.1 simulated seconds
 
 **Guarded live deployment.** Release `20261109T201829172528171Z` uses the API and worker sources from `8977945`. Eight mocked cases exercised the new idle gate before the live rollout. On the host the gate acquired the verification and PostgreSQL worker-row locks, observed no active or waiting match, a fresh zero-peer report, and an empty result outbox, then stopped the services. The deployment verified a fresh backup and restarted both services. Existing profile and completed-result IDs matched before and after restart. PostgreSQL and nginx stayed active. The new worker reported ready with encrypted UDP 7777, 50 Hz physics, 30 Hz snapshots and zero active fixed steps. `Logs/OnlinePilotVerification/CurrentAudit/deployment-20261109.txt`
 
+## Active and idle resource measurements (items 7–8)
+
+Both samples used release `20261109T201829172528171Z` on the four-vCPU host. The active sample covered 70.44 seconds from 20:21:21 UTC with the same match active at both ends. The idle sample covered 65.43 seconds from 20:26:49 UTC after the room cleared. CPU percentages below are relative to one logical CPU. Memory is mean cgroup memory sampled at 1 Hz, including PostgreSQL backends.
+
+| Service | Idle CPU | Idle MiB | Active CPU | Active MiB |
+| --- | ---: | ---: | ---: | ---: |
+| Match worker | 1.741% | 83.35 | 4.853% | 82.63 |
+| API | 0.895% | 50.82 | 1.327% | 45.40 |
+| PostgreSQL | 0.055% | 46.73 | 0.076% | 47.88 |
+
+- The worker's highest active 1 Hz memory sample was 83.56 MiB. During the idle sample the worker stayed at zero peers, 9,876 enabled physics callbacks and 7,294 snapshots. Its malformed rejection total stayed at one and it counted 242 normal closing heartbeats separately.
+- A two-peer 60.01-second mid-match window recorded 1,801 snapshots (30.01/s) and 2,815 enabled physics callbacks (46.91/s including match pauses, with a configured 50 Hz physics step). Worker wall-frame intervals averaged 16.745 ms and peaked at 21.138 ms. The Linux release did not expose the Physics2D CPU profiler marker.
+- Game payload averaged 7.50 kbit/s inbound and 35.25 kbit/s outbound per player, from the server's perspective. Those counters include input, probes and state payloads. They exclude transport overhead, retransmissions and API traffic. During the separate 70.44-second resource sample, the host's public interface counted 953,378 bytes inbound and 1,752,122 bytes outbound across all traffic.
+- PostgreSQL grew by 8,192 bytes to 8,394,431 bytes during the active sample and was unchanged in the idle sample. The active sample added 145 bytes of nginx logs. The other measured service directories held steady during that sample. The filesystem had about 68.9 GiB free. These short samples do not establish long-term disk growth or billable traffic.
+- Tested concurrency is one full 1v1 match. The pilot intentionally has one match room.
+
+Evidence is in `Logs/OnlinePilotVerification/CurrentAudit/active-resources-20261109-retry.txt`, `midmatch-counters-20261109.txt` and `postmatch-idle-20261109.txt`.
+
 ## Historical checkpoint
 
 This is an intermediate, measured record from **4 November 2026, 11:36 UTC**. A configured room capacity does not establish tested gameplay capacity. Windows gameplay and active-match measurements must be recorded separately before the pilot is called complete.

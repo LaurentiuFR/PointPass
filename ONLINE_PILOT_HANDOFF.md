@@ -4,7 +4,7 @@ This is the entry point for the next coding agent. Read this file, `README.md`, 
 
 ## Workspace and Git
 
-- Current continuation worktree: `C:\Dev\PointPass` (5 November 2026).
+- Current continuation worktree: `C:\Dev\PointPass` (9 November 2026).
 - Branch: `codex/online-server-integration`, based on `main` commit `6f44996d174259aeb2b1fc7af688b37aaf51a61d`.
 - The owner now authorizes a commit and `git push -u origin codex/online-server-integration` after each completed item. Never merge main or force-push. Stage only explicit reviewed files; exclude secrets and generated folders.
 - The separate menu/gameplay draft remains in local stash `99b13ef623842d8bb5bd8da480593634aad8e2c8`, from `codex/mobile-hud-simplified-menu`. Do not apply or merge it during this online audit. The owner must identify the other agent's branch before a later integration.
@@ -35,8 +35,8 @@ Prior implementation and deployment claims below are historical until rechecked.
 | 4. Restart persistence | **PASS, isolated Ubuntu/PostgreSQL restart**. The same guest credential authenticated after the API process restarted, returning the same profile and verified result. The production profiles were left running for this check. |
 | 5. Exposure | **PASS, live**: UFW default-deny and `ss` expose only application TCP22/80/443 + UDP7777; API stays loopback5000, PostgreSQL has no TCP listener. External TCP22/80/443 connected; 5000/5001/5432 closed/filtered. Public internal route is 404, unauthenticated profile 401. |
 | 6. Certificates | **PASS, live**: Certbot 5.8.0, normal OS trust/IP checks, wrong-IP/name rejection, successful staging renewal dry run, idle deploy-hook/reload acknowledgement and expiry guard. The scheduled renewal served a new certificate on 7 Nov, trusted by Windows on 9 Nov and expiring 14 Nov at 03:18 UTC. |
-| 7. Idle worker | **PASS, live 65.42 s sample**. Zero peers and unchanged simulated time and snapshots. Match worker used 1.704% of one core and averaged 84.44 MiB cgroup memory. |
-| 8. Active resources/capacity | Idle baseline saved. Active two-client CPU, bandwidth, disk and timing proof is pending. The pilot has one configured room. |
+| 7. Idle worker | **PASS, live**. After the full match, the updated worker had zero peers and unchanged physics and snapshot counters. In 65.43 s it used 1.741% of one core and averaged 83.35 MiB cgroup memory. |
+| 8. Active resources/capacity | **PASS for one concurrent 1v1**. Over 70.44 s with the match active, worker CPU averaged 4.853% of one core and memory averaged 82.63 MiB. A 60.01 s mid-match window measured about 7.5 kbit/s inbound and 35.25 kbit/s outbound of game payload per player. See the disk and timing measurements in `Deploy/VERIFICATION.md`. Linux release Physics2D CPU marker unavailable. |
 | 9. Backups/retention | **PASS, live drill**: fresh private dump restored 2 profiles/2 verified results into a disposable DB, then that DB was removed. Six successful dumps, each <=1GiB, mode0600 under root0700; no partial files. Seven-dump policy and active daily/logrotate/journal retention verified. Same-SSD/off-host limit documented. |
 | 10. Costs | **PASS, documented** in `Deploy/COSTS.md`: owner-reported 10.19/month plus usage charges, published EU traffic/IPv4/optional-storage terms and explicit unknown currency/VAT/account tariff. No paid add-ons enabled. |
 | 11. Regressions | **PASS**. Local automated offline, protocol, headless, command-boundary, rendered gameplay and API suites passed. Fresh Linux and Windows builds succeeded. Two Windows clients on one PC passed 41 live checks, agreed on 6,069 snapshots, and finished 2–1 with a verified PostgreSQL result. |
@@ -67,11 +67,10 @@ The audited Linux worker and API are live as release `20261109T201829172528171Z`
 - Root/password SSH policy is intentionally unchanged at the owner's request. Do not harden it until a separately approved recovery administrator is verified. An earlier unrestricted passwordless-sudo proposal was rejected and never ran.
 - Current release symlink: `/opt/pointpass/current`. API and match protected configuration: `/etc/pointpass/api.env` and `match.env`. These files contain secrets and must never be printed or packaged.
 - Root-owned release binaries; writable worker state `/var/lib/pointpass-match`. Result outbox is `pending-result.json`; retry it before replacing a worker lease. A permanently conflicting/corrupt outbox needs operator review rather than silent deletion.
-- Existing SSH key path on Larry's machine: `C:\Users\Larry\.ssh\pointpass_hetzner_ed25519`. Use it for SSH only; never read, print, copy, commit or upload its private contents. Verified host fingerprint: `SHA256:cinqGMWTldXWlxt9FWNy62f5GcFvvb+00N1/ti71Tv0`.
-- Windows OpenSSH needs `-o KexAlgorithms=curve25519-sha256` with this host. Verified known-hosts file is `C:\Dev\PointPass\Logs\OnlinePilotAudit\known_hosts`. Keep strict host verification enabled.
-- Invitations remain in protected server files. Two test profiles were signed in by the owner through the actual game UI. Their reusable credentials are DPAPI-protected client-local files; they are not in the repository/build/delivery. Do not export server invitations without explicit authorization.
+- Use the locally authorized SSH key in place. Verified ED25519 host fingerprint is `SHA256:cinqGMWTldXWlxt9FWNy62f5GcFvvb+00N1/ti71Tv0`. Windows OpenSSH uses `-o KexAlgorithms=curve25519-sha256` with strict host checking. The audit pin file is under the ignored `Logs/OnlinePilotVerification/CurrentAudit` directory.
+- The audit used two memory-only invitations. Both were consumed once. The reusable guest credentials are client-local, protected by Windows DPAPI.
 
-Certificate renewal runs every six hours; a daily check warns/fails below 48 hours remaining. The certificate issued for this rollout expires around **2026-11-10 14:52 UTC**. Nginx reloads immediately; the match worker reloads its copied certificate on an idle transport restart. ACME staging/renewal dry-run was unavailable during published maintenance until November 4 at 21:00 UTC: verify it afterwards. No certificate-validation bypass was used.
+Certificate renewal checks run every six hours. The daily expiry guard fails when fewer than 48 hours remain. The trusted certificate served on 9 November expires **2026-11-14 03:18 UTC**. Staging renewal passed, and the rollout drill verified nginx reload and the worker's idle certificate reload. Certificate validation stayed enabled.
 
 Daily bounded database backups, a disposable restore check, limited journals and Nginx rotation are configured. A real backup containing two guest profiles and a completed result was restored successfully. Backups are on the same SSD and do not protect against server loss. No paid backup destination or other paid add-on was enabled. Existing hosting and possible provider traffic/storage overage charges still apply; the actual account tariff was not available here.
 
@@ -81,24 +80,22 @@ Use Unity **6000.3.27f2** with Windows and Linux Dedicated Server/Mono support. 
 
 Windows build: `Builds/OnlinePilot/Client/PointPass.exe` plus its entire adjacent data/runtime directory. Linux build: `Builds/OnlinePilot/Server/PointPassServer.x86_64` plus adjacent runtime/data. Both builds compiled without errors. Presentation exclusion passed for Linux. Incidental Unity-generated rendering/project settings changes were removed from this worktree; no original user settings were reset.
 
-Completed engine/backend checks: 409 offline regressions, 28 headless Play Mode assertions, 16 command-boundary assertions, 248 wire-codec assertions, 47 distinct actual Ubuntu/PostgreSQL assertions. Windows Unity/NGO negative-admission tests reached the real server with a correctly validated certificate, rejected invalid tickets and a wrong TLS name, and recovered normally afterwards.
+Completed automated checks include 409 offline engine assertions, 51 rendered offline checks, 28 headless checks, 16 command-boundary checks, 248 wire-codec checks and 54 distinct isolated Ubuntu/PostgreSQL checks. Windows Unity/NGO negative-admission tests exercised trusted transport, invalid tickets, the wrong TLS name and recovery.
 
-Two actual Windows client processes on one PC connect through the public Helsinki server. This is an internet-path test, not proof of two physical PCs or phones. The owner completed first sign-in for profiles `pilot-blue` and `pilot-red`; the harness reuses their protected credentials without invitation files:
+The audit used two Windows clients on one PC over the public Helsinki server. The harness can reuse the protected profiles as follows.
 
 ```powershell
-./Tools/Validation/Online/Test-OnlinePilot.ps1 -FullMatch
+./Tools/Validation/Online/Test-OnlinePilotSsh.ps1 -SshKeyPath $key -KnownHostsFile $knownHosts -BlueProfile audit-blue-1109 -RedProfile audit-red-1109 -ReuseProfiles -FullMatch
 ```
 
-The first two failures were test-fixture issues, preserved under ignored verification logs: a press before interpolated possession was eligible, and a defender correctly blocking a shot. The development driver now waits for local acceptance, guards cleanup and the scripted defender moves out of the lane through ordinary input. No gameplay was changed to force test success.
-
-Final results, exact snapshot count, active measurements and any remaining tests are recorded in `Deploy/VERIFICATION.md` and `Logs/OnlinePilotVerification/Clients/two-windows-clients.txt`. A real earlier 0–0 match completed through normal overtime, was saved exactly once and returned both clients home. The final 2–1 scenario additionally checks both charged curved goals, common scores/restarts, paused clock on disconnect and successful same-guest rejoin. Consult its final report rather than assuming completion from this document.
+See `Deploy/VERIFICATION.md` for the complete results and resource measurements. The corrected 9 November run finished 2–1 and passed 41 checks, including the two-way passing, curved goals and same-guest reconnect. The full run report is `Logs/OnlinePilotVerification/CurrentAudit/Clients-20261109-retry/two-windows-clients.txt`.
 
 ## Important limits and follow-up
 
 - Only one concurrent 1v1 match is implemented and tested; do not infer ten-player capacity or add workers without measurement.
 - No client prediction/reconciliation yet. Authoritative input plus 100 ms presentation interpolation adds visible latency. Test by hand on two physical PCs/different access networks before inviting more players.
 - The F3 retry/drop estimate is a cumulative reliable-pipeline proxy that includes retransmissions due to delay. It is not an independent IP-loss measurement. Snapshot gaps and round-trip probes are separate. Hidden-player frame-loop FPS is not visible rendering performance.
-- The worker's aggregate rejection counter currently also counts normal heartbeats arriving during its four-second full-time/result closing phase. These are not proof of cheating; there are no automatic bans. The malformed-command rejection proof was sampled before that closing phase.
+- The worker records malformed input and ordinary waiting/closing heartbeats in separate counters. The live run recorded one malformed rejection and 242 ordinary closing heartbeats.
 - Credential storage and device input/performance have only been validated on Windows. No Android/iOS hardware testing, signing, TestFlight or deployment was done.
 - Keep the friend's menu/dribbling/tackle work separate until integration is explicitly requested. Extend server commands and bump the protocol when introducing authoritative gameplay actions.
-- Finish any pending verification in `Deploy/VERIFICATION.md`, keep tests labelled automated/manual/pending, and review the full delivery patch before requesting a commit/push. Do not merge main automatically.
+- Keep future validation labelled automated, manual or pending. Push only to `codex/online-server-integration` under this audit's authorization.
