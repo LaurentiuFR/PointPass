@@ -39,7 +39,7 @@ Evidence: `Logs/OnlinePilotVerification/CurrentAudit/backup-restore.txt`. Dumps 
 
 The owner reports 10.19/month plus usage costs. `Deploy/COSTS.md` records official traffic/storage/IPv4 terms without assuming the invoice currency, VAT, legacy tariff or whether IPv4 is already included. The exact billed total needs the account invoice/usage. No purchases, paid backups, snapshots, resizing or add-ons were enabled.
 
-## Interim security, regression and compatibility evidence
+## Security, regression and compatibility evidence
 
 The evidence here was collected on 5 November 2026 and reviewed on 9 November. The isolated security suite ran against PostgreSQL `pointpass_validation` and a loopback API on port 5001. It passed 52 checks, then 22 after the isolated API restarted. Twenty checks repeated, giving 54 distinct assertions. The report is `Logs/OnlinePilotVerification/CurrentAudit/backend-integration.txt`.
 
@@ -50,9 +50,9 @@ The evidence here was collected on 5 November 2026 and reviewed on 9 November. T
 - **Duplicate results were idempotent in isolation.** Repeating the trusted result yielded one history entry and one win. A conflicting repeat returned 409. `Logs/OnlinePilotVerification/CurrentAudit/backend-integration.txt`
 - **Invalid commands were rejected live and in local Unity fixtures.** The codec and command-boundary suites covered malformed payloads, ownership and stale or duplicate releases. Another 25 worker metric checks verified rejection reasons and separate accounting for normal waiting or closing heartbeats. On 9 November the authenticated Blue client sent one deliberately invalid three-byte input. The same worker process reported `malformedRejected=0` before and `malformedRejected=1` after, with all other rejection categories at zero. Both clients continued receiving state. `Logs/OnlinePilotVerification/CurrentAudit/midmatch-counters-20261109.txt`, `Logs/OnlinePilotVerification/worker-metrics-tests.txt`
 - **Full-room rejection passed in isolation.** A third guest received 409 after both slots were reserved. `Logs/OnlinePilotVerification/CurrentAudit/backend-integration.txt`
-- **Disconnect/rejoin passed in isolation.** The same guest reclaimed the original slot with a fresh ticket. A stale disconnect could neither eject the reconnected guest nor overwrite its connection identity. `Logs/OnlinePilotVerification/CurrentAudit/backend-integration.txt`
+- **Disconnect/rejoin passed live and in isolation.** In the two-client match, Red disconnected, Blue observed the paused clock, and Red reclaimed slot 1 within 30 seconds with the 1–1 score intact. The isolated API also rejected a stale disconnect after rejoin. `Logs/OnlinePilotVerification/CurrentAudit/Clients-20261109-retry/two-windows-clients.txt`, `Logs/OnlinePilotVerification/CurrentAudit/backend-integration.txt`
 
-The live two-client rerun remains pending, including authenticated invalid-command, full-room and disconnect/rejoin checks. The independently verified 2–1 database result above records the earlier match outcome.
+After rollout, the public HTTPS health endpoint returned 200, an unauthenticated profile request returned 401, and the private counters route returned 404. Windows certificate validation stayed enabled. Expired and reused tickets, duplicate submissions and third-guest rejection were exercised against the disposable API and PostgreSQL instance.
 
 **Guest persistence after restart (item 4).** The isolated API was stopped and started against the same PostgreSQL database. The original guest credential returned the same identity and its verified result after startup. Both post-restart assertions passed. The isolated API and database were removed after the check. `Logs/OnlinePilotVerification/CurrentAudit/backend-integration.txt`
 
