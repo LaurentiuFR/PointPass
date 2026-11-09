@@ -14,11 +14,11 @@ Reports are generated under ignored `Logs/OnlinePilotVerification` and `Logs/PR2
 | Physics-only headless composition, physical goals, both players' kicks and restarts | 28 Play Mode assertions passed |
 | Charge ownership, cancellation, stale/duplicate releases | 16 Play Mode assertions passed |
 | Explicit binary encoding, malformed/truncated/nonfinite payloads, NGO buffer boundaries | 248 assertions passed in Unity |
-| Backend/database security, capacity, single-use tickets, orphan reconciliation and restart persistence | 47 distinct assertions passed on Ubuntu/PostgreSQL; repeated pure checks are not counted twice |
+| Backend/database security, capacity, single-use tickets, orphan reconciliation and restart persistence | 54 distinct assertions passed against the disposable Ubuntu/PostgreSQL API; repeated checks counted once |
 | Linux dedicated-server build | Compiled without errors; build report excludes project art/audio/Resources presentation assets |
 | Windows client build | Compiled without errors |
 | Linux DTLS and Windows Unity/NGO encrypted connection | Correct IP certificate accepted; wrong certificate name/IP and invalid ticket rejected; recovery passed |
-| Two actual Windows clients playing a full match | Pending private first sign-in; do not infer a pass from the other checks |
+| Two actual Windows clients playing a full match | 41 automated live checks passed on 9 November with two Windows processes on one PC. Full-time score 2–1, 6,069 identical shared snapshots, and a unique PostgreSQL result |
 | Phone testing | Unavailable; neither Android nor iOS has been validated |
 
 Deployment state, resource measurements, encrypted transport and actual client results must be recorded after running them. See [deployment and operations](../../../Deploy/README.md) and [backend contracts](../../../Backend/README.md).

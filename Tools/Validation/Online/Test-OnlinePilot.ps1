@@ -234,7 +234,12 @@ try {
     $beforePass = (Read-State $BlueProfile).blueKicks
     Charged-Kick $BlueProfile pass
     Wait-For { $s = Read-State $BlueProfile; $s.blueKicks -gt $beforePass -and $s.owner -eq 1 } 'A charged Blue pass physically reaches Red and transfers shared possession' 10
-    Check ((Read-State $RedProfile).owner -eq 1) 'Both views agree Red owns the received pass'
+    # The two state files can advance on different frames. Wait for Red to
+    # receive the transfer before asking it to start the return pass.
+    Wait-For {
+        $a = Read-State $BlueProfile; $b = Read-State $RedProfile
+        $a.owner -eq 1 -and $b.owner -eq 1 -and $b.blueKicks -gt $beforePass
+    } 'Both views agree Red owns the received pass' 4
 
     $receiver = (Read-State $RedProfile).blue
     Aim-At $RedProfile $receiver.x $receiver.y
