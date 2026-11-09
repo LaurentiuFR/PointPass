@@ -30,7 +30,7 @@ Prior implementation and deployment claims below are historical until rechecked.
 | Item | Current evidence/status |
 | --- | --- |
 | 1. Final match history | **PASS, live read-only SQL**: match `570b1a48-3b81-47d4-ae54-9d9cdca95e8b`, completed 4 Nov 16:27:53 UTC, score 2–1, one match row and one history occurrence in each of two distinct slots. Repeat with `Tools/Validation/Online/AuditHistory.sql`. |
-| 2. Invalid-command counters | Baseline worker aggregate `rejected=489`; category-specific proof still pending. Closing-phase heartbeats must not be mislabelled malformed commands. |
+| 2. Invalid-command counters | **PASS, live**. One authenticated three-byte invalid input raised `malformedRejected` from 0 to 1 on the same worker process. Both clients continued receiving state. Other rejection categories stayed at zero through the next summary. |
 | 3. Separate security/transport checks | HTTPS `/health` 200 with default OS trust; remaining separate cases pending current run. |
 | 4. Restart persistence | **PASS, isolated Ubuntu/PostgreSQL restart**. The same guest credential authenticated after the API process restarted, returning the same profile and verified result. The production profiles were left running for this check. |
 | 5. Exposure | **PASS, live**: UFW default-deny and `ss` expose only application TCP22/80/443 + UDP7777; API stays loopback5000, PostgreSQL has no TCP listener. External TCP22/80/443 connected; 5000/5001/5432 closed/filtered. Public internal route is 404, unauthenticated profile 401. |
